@@ -16,27 +16,31 @@
 
 package globals
 
-import "io"
-import "os"
-import "fmt"
-import "time"
-import "math"
-import "net/url"
-import "strings"
-import "strconv"
-import "math/big"
-import "path/filepath"
-import "runtime/debug"
-import "golang.org/x/net/proxy"
+import (
+	"fmt"
+	"io"
+	"math"
+	"math/big"
+	"net/url"
 
-import "go.uber.org/zap"
-import "go.uber.org/zap/zapcore"
-import "github.com/go-logr/logr"
-import "github.com/go-logr/zapr"
-import "github.com/robfig/cron/v3"
+	"os"
 
-import "github.com/deroproject/derohe/config"
-import "github.com/deroproject/derohe/rpc"
+	"path/filepath"
+	"runtime/debug"
+	"runtime/pprof"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/derohe/rpc"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zapr"
+	"github.com/robfig/cron/v3"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"golang.org/x/net/proxy"
+)
 
 // all the the global variables used by the program are stored here
 // since the entire logic is designed around a state machine driven by external events
@@ -45,6 +49,7 @@ import "github.com/deroproject/derohe/rpc"
 var Subsystem_Active uint32 // atomic counter to show how many subsystems are active
 var Exit_In_Progress bool
 var StartTime = time.Now()
+var BlockChainStartHeight int64
 
 // on init this variable is updated to setup global config in 1 go
 var Config config.CHAIN_CONFIG = config.Mainnet // default is mainnnet
@@ -57,6 +62,40 @@ var ClockOffsetNTP time.Duration // clockoffset in reference to ntp servers
 var ClockOffsetP2P time.Duration // clockoffset in reference to p2p averging
 var TimeIsInSync bool            // whether time is in sync, if yes we do not use any clock offset but still we keep calculating them
 var TimeIsInSyncNTP bool
+var NetworkTurtle bool = true
+
+var DiagnocticCheckRunning bool = false
+var NextDiagnocticCheck int64 = time.Now().Unix() + 15
+var BlockPopCount int64
+
+var SeedHeight int64 = 0
+
+var BlocksMined int64
+
+var Pool_mode bool
+var Pool_wallet string
+var Pool_wallet_address string
+
+var threadProfile = pprof.Lookup("threadcreate")
+var mutexProfile = pprof.Lookup("mutex")
+var blockingProfile = pprof.Lookup("block")
+var goProfile = pprof.Lookup("goroutine")
+
+func CountThreads() int {
+	return threadProfile.Count()
+}
+
+func CountMutex() int {
+	return mutexProfile.Count()
+}
+
+func CountBlocked() int {
+	return blockingProfile.Count()
+}
+
+func CountGoProcs() int {
+	return goProfile.Count()
+}
 
 // get current time with clock offset applied
 func Time() time.Time {
@@ -132,10 +171,39 @@ func (c *removeCallerCore) With(fields []zap.Field) zapcore.Core {
 	return &removeCallerCore{c.Core.With(fields)}
 }
 
+func SetLogLevel(console, logfile io.Writer, log_level int) {
+
+	Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(log_level))
+
+	zf := zap.NewDevelopmentEncoderConfig()
+	zc := zap.NewDevelopmentEncoderConfig()
+	zc.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	zc.EncodeTime = zapcore.TimeEncoderOfLayout("02/01 15:04:05")
+
+	file_encoder := zapcore.NewJSONEncoder(zf)
+	console_encoder := zapcore.NewConsoleEncoder(zc)
+
+	core_console := zapcore.NewCore(console_encoder, zapcore.AddSync(console), Log_Level_Console)
+	removecore := &removeCallerCore{core_console}
+	core := zapcore.NewTee(
+		removecore,
+		zapcore.NewCore(file_encoder, zapcore.AddSync(logfile), Log_Level_File),
+	)
+
+	zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
+
+	Logger = zapr.NewLogger(zcore) // sets up global logger
+	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
+
+	// remember -1 is debug, 0 is info
+
+}
+
 func InitializeLog(console, logfile io.Writer) {
 
 	if Arguments["--debug"] != nil && Arguments["--debug"].(bool) == true { // setup debug mode if requested
 		Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(-1))
+		config.RunningConfig.LogLevel = 1
 	}
 
 	if Arguments["--clog-level"] != nil { // setup log level if requested
@@ -147,6 +215,7 @@ func InitializeLog(console, logfile io.Writer) {
 		if log_level > 127 {
 			log_level = 127
 		}
+		config.RunningConfig.LogLevel = log_level
 		Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(0 - log_level))
 	}
 
