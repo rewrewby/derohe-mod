@@ -1985,7 +1985,8 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mmined_blocks\033[0m\tList Mined Blocks\n")
 	io.WriteString(w, "\t\033[1morphaned_blocks\033[0m\tList Our Orphaned Blocks\n")
 	io.WriteString(w, "\t\033[1maddress_to_name\033[0m\tLookup registered names for Address\n")
-	io.WriteString(w, "\t\033[1mlist_all_connections\033[0m\tList All Connection\n")
+	io.WriteString(w, "\t\033[1mactive_miners\033[0m\tShow Active Miners on Network\n")
+	io.WriteString(w, "\t\033[1mactive_nodes\033[0m\tShow Active Mining Nodes\n")
 	io.WriteString(w, "\t\033[1mshow_selfish\033[0m\tShow Nodes that don't play nice\n")
 
 }
@@ -2039,7 +2040,6 @@ var completer = readline.NewPrefixCompleter(
 	readline.PcItem("mined_blocks"),
 	readline.PcItem("orphaned_blocks"),
 	readline.PcItem("address_to_name"),
-	readline.PcItem("list_all_connections"),
 	readline.PcItem("show_selfish"),
 )
 
