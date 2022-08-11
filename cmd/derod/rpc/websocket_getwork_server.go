@@ -207,7 +207,9 @@ func UpdateMinerStats() {
 		i.miniblocks = sess.miniblocks
 		i.rejected = sess.rejected
 		i.tag = sess.tag
-		i.hashrate = sess.hashrate
+		if sess.hashrate > 0 {
+			i.hashrate = sess.hashrate
+		}
 		if len(sess.lasterr) > 0 {
 			i.lasterr = sess.lasterr
 		}
@@ -228,9 +230,24 @@ func UpdateMinerStats() {
 
 	// reset counter
 	CountMinisOrphaned = 0
-	for miner := range miner_stats {
+	for miner, stat := range miner_stats {
 		orphan_count := block.GetMinerOrphanCount(miner)
 		CountMinisOrphaned += int64(orphan_count)
+
+		// clear out dead connection
+		if stat.miniblocks == 0 && stat.blocks == 0 && stat.rejected == 0 && stat.orphaned == 0 {
+			found := false
+
+			for conn := range client_list {
+				if conn.RemoteAddr().String() == miner {
+					found = true
+				}
+			}
+
+			if !found {
+				delete(miner_stats, miner)
+			}
+		}
 	}
 
 	globals.BlocksMined = (CountMinisAccepted + CountBlocks) - CountMinisOrphaned
@@ -262,7 +279,7 @@ func ShowMinerInfo(wallet string) {
 	count := 0
 	for ip_address, stat := range miner_stats {
 
-		if fmt.Sprintf("%s", stat.address) != wallet && ParseIPNoError(wallet) != ParseIPNoError(ip_address) {
+		if stat.address != wallet && ParseIPNoError(wallet) != ParseIPNoError(ip_address) {
 			continue
 		}
 
@@ -347,9 +364,6 @@ func ListMiners() {
 
 		if MinerIsConnected(ip_address) {
 			i.hashrate += stat.hashrate
-		}
-
-		if MinerIsConnected(ip_address) {
 			i.is_connected = "yes"
 			i.miners_connected++
 		} else if i.is_connected != "yes" {

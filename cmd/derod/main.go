@@ -338,7 +338,7 @@ func main() {
 	}
 	globals.Cron.Start() // start cron jobs
 
-	globals.Cron.AddFunc("@every 10s", derodrpc.UpdateMinerStats)
+	globals.Cron.AddFunc("@every 1s", derodrpc.UpdateMinerStats)
 	globals.Cron.AddFunc("@every 10s", p2p.UpdateLiveBlockData)
 	// This tiny goroutine continuously updates status as required
 	go func() {
