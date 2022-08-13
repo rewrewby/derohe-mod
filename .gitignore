@@ -7,3 +7,4 @@ cmd/*/history/
 cmd/*/history/*
 cmd/dero-wallet-cli/*.db*
 cmd/dero-miner/stats.out
+build/
