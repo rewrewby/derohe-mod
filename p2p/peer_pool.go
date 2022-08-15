@@ -237,6 +237,7 @@ func SetLogger(newlogger *logr.Logger) {
 
 		logger = *newlogger
 		c.logger = logger.WithName("incoming").WithName(c.Addr.String())
+		connection_map.Store(k, &c)
 
 		return true
 	})
