@@ -338,7 +338,6 @@ func main() {
 	}
 	globals.Cron.Start() // start cron jobs
 
-	globals.Cron.AddFunc("@every 1s", derodrpc.UpdateMinerStats)
 	globals.Cron.AddFunc("@every 10s", p2p.UpdateLiveBlockData)
 	// This tiny goroutine continuously updates status as required
 	go func() {
@@ -1310,26 +1309,26 @@ restart_loop:
 
 			fmt.Printf("%-72s %-32s %-12s %s\n\n", "Wallet", "IP Address", "Height", "Block")
 
-			MyOrphanBlocks := block.GetMyOrphansList()
+			// MyOrphanBlocks := block.GetMyOrphansList()
 
 			count := 0
-			for miner, _ := range MyOrphanBlocks {
+			// for miner, _ := range MyOrphanBlocks {
 
-				wallet := derodrpc.GetMinerWallet(miner)
+			// 	wallet := derodrpc.GetMinerWallet(miner)
 
-				for _, height := range MyOrphanBlocks[miner] {
-					hash, err := chain.Load_Block_Topological_order_at_index(int64(height))
-					if err != nil {
-						fmt.Printf("Skipping block at topo height %d due to error %s\n", height, err)
+			// 	for _, height := range MyOrphanBlocks[miner] {
+			// 		hash, err := chain.Load_Block_Topological_order_at_index(int64(height))
+			// 		if err != nil {
+			// 			fmt.Printf("Skipping block at topo height %d due to error %s\n", height, err)
 
-					} else {
+			// 		} else {
 
-						fmt.Printf("%-72s %-32s %-12d %s\n", wallet, miner, height, hash)
-					}
-					count++
+			// 			fmt.Printf("%-72s %-32s %-12d %s\n", wallet, miner, height, hash)
+			// 		}
+			// 		count++
 
-				}
-			}
+			// 	}
+			// }
 
 			fmt.Printf("Orphan Blocks Collection Size: %d\n", count)
 			fmt.Print("\n")
@@ -1341,23 +1340,23 @@ restart_loop:
 			fmt.Printf("%-72s %-32s %-12s %s\n\n", "Wallet", "IP Address", "Height", "Block")
 
 			count := 0
-			for miner, block_list := range block.MyBlocks {
+			// for miner, block_list := range block.MyBlocks {
 
-				wallet := derodrpc.GetMinerWallet(miner)
+			// 	wallet := derodrpc.GetMinerWallet(miner)
 
-				for _, mbl := range block_list {
-					hash, err := chain.Load_Block_Topological_order_at_index(int64(mbl.Height))
-					if err != nil {
-						fmt.Printf("Skipping block at topo height %d - likely not committed yet\n", mbl.Height)
+			// 	for _, mbl := range block_list {
+			// 		hash, err := chain.Load_Block_Topological_order_at_index(int64(mbl.Height))
+			// 		if err != nil {
+			// 			fmt.Printf("Skipping block at topo height %d - likely not committed yet\n", mbl.Height)
 
-					} else {
+			// 		} else {
 
-						fmt.Printf("%-72s %-32s %-12d %s\n", wallet, miner, mbl.Height, hash)
-					}
-					count++
-				}
+			// 			fmt.Printf("%-72s %-32s %-12d %s\n", wallet, miner, mbl.Height, hash)
+			// 		}
+			// 		count++
+			// 	}
 
-			}
+			// }
 
 			fmt.Printf("Mined Blocks Collection Size: %d\n", count)
 			fmt.Print("\n")
