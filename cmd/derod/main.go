@@ -161,6 +161,12 @@ func dump(filename string) {
 	}
 }
 
+func ProcessOrphan(wallet string) {
+
+	go derodrpc.IncreaseMinerCount(wallet, "orphaned", "")
+
+}
+
 var threadStartCount int
 var mutexStartCount int
 var blockingStartCount int
@@ -1294,7 +1300,7 @@ restart_loop:
 
 				}
 				fmt.Print("\n")
-				derodrpc.ShowMinerInfo(line_parts[1])
+				// derodrpc.ShowMinerInfo(line_parts[1])
 			} else {
 				fmt.Printf("usage: miner_info <wallet address/ip>\n")
 			}
