@@ -345,7 +345,7 @@ func ListMiners() {
 			is_connected = "yes"
 		}
 
-		fmt.Printf("%-72s %-10s %-12s %-12s %-12d %-12d %-12d %-12d %-14s %-12s\n", wallet, is_connected, miners_connected_str, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, stat.orphaned, success_rate_str, stat.lasterr)
+		fmt.Printf("%-72s %-10s %-12s %-12s %-12d %-12d %-12d %-12d %-14s %-12s\n", wallet, is_connected, miners_connected_str, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, block.GetMinerOrphanCount(wallet), success_rate_str, stat.lasterr)
 
 	}
 
