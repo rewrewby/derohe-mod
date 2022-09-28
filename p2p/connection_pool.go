@@ -369,6 +369,7 @@ func Connection_Print() {
 
 		fmt.Print(color_normal)
 	}
+	logger.Info("Connection info for peers", "count", len(clist), "our Statehash", StateHash)
 
 	avg_latency := sum_latency / int64(len(clist))
 	fmt.Printf("Average Latency: %7s\n", time.Duration(avg_latency).Round(time.Millisecond).String())
