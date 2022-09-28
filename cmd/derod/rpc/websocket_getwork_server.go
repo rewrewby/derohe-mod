@@ -160,7 +160,7 @@ type inner_miner_stats struct {
 var miner_stats_mutex sync.Mutex
 var miner_stats = make(map[string]inner_miner_stats)
 
-func IncreaseMinerCount(wallet string, counter string, argument string) {
+func IncreaseMinerCount(ip string, wallet string, counter string, argument string) {
 
 	miner_stats_mutex.Lock()
 	defer miner_stats_mutex.Unlock()
@@ -207,6 +207,28 @@ func IncreaseMinerCount(wallet string, counter string, argument string) {
 		}
 	}
 	CountUniqueMiners = int64(count)
+
+	if i.miniblocks >= 25 {
+
+		// Check if this is a cheater
+		ratio := 0.0
+		if i.blocks > 0 {
+			ratio = float64(float64(i.blocks)/float64(i.blocks+i.miniblocks)) * 100
+		}
+
+		if i.blocks == 0 || ratio <= 5.0 {
+			rate_lock.Lock()
+			defer rate_lock.Unlock()
+
+			x := ban_list[ip]
+			x.fail_count++
+
+			logger_getwork.V(1).Info(fmt.Sprintf("Bad miner (IB:%d MB:%d - %.1f%%)", i.blocks, i.miniblocks, ratio), wallet, "Address", ip, "Info", "Cheater")
+
+			ban_list[ip] = x
+		}
+
+	}
 }
 
 func ShowMinerInfo(wallet string) {
@@ -439,7 +461,7 @@ func newUpgrader() *websocket.Upgrader {
 		if err != nil {
 			//logger.Info("Submitting block could not be decoded")
 			sess.lasterr = fmt.Sprintf("Submitted block could not be decoded. err: %s", err)
-			go IncreaseMinerCount(sess.address.String(), "lasterror", sess.lasterr)
+			go IncreaseMinerCount(miner, sess.address.String(), "lasterror", sess.lasterr)
 			return
 		}
 
@@ -463,7 +485,7 @@ func newUpgrader() *websocket.Upgrader {
 			if blid.IsZero() {
 				sess.miniblocks++
 				atomic.AddInt64(&CountMinisAccepted, 1)
-				go IncreaseMinerCount(sess.address.String(), "miniblocks", "")
+				go IncreaseMinerCount(miner, sess.address.String(), "miniblocks", "")
 
 				rate_lock.Lock()
 				defer rate_lock.Unlock()
@@ -480,7 +502,7 @@ func newUpgrader() *websocket.Upgrader {
 			} else {
 				sess.blocks++
 				atomic.AddInt64(&CountBlocks, 1)
-				go IncreaseMinerCount(sess.address.String(), "blocks", "")
+				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
 			}
 		}
 
@@ -488,11 +510,11 @@ func newUpgrader() *websocket.Upgrader {
 			sess.rejected++
 			atomic.AddInt64(&CountMinisRejected, 1)
 
-			go IncreaseMinerCount(sess.address.String(), "rejected", "")
+			go IncreaseMinerCount(miner, sess.address.String(), "rejected", "")
 
 			if err != nil {
 				sess.lasterr = err.Error()
-				go IncreaseMinerCount(sess.address.String(), "lasterror", sess.lasterr)
+				go IncreaseMinerCount(miner, sess.address.String(), "lasterror", sess.lasterr)
 			}
 
 			rate_lock.Lock()
@@ -507,7 +529,7 @@ func newUpgrader() *websocket.Upgrader {
 
 				delete(client_list, c)
 				logger_getwork.V(1).Info("Banned miner", "Address", miner, "Info", "Banned")
-				go IncreaseMinerCount(sess.address.String(), "lasterror", "Banned miner")
+				go IncreaseMinerCount(miner, sess.address.String(), "lasterror", "Banned miner")
 			}
 			ban_list[miner] = i
 		}
@@ -515,7 +537,7 @@ func newUpgrader() *websocket.Upgrader {
 	u.OnClose(func(c *websocket.Conn, err error) {
 
 		sess := c.Session().(*user_session)
-		go IncreaseMinerCount(sess.address.String(), "byeminer", "")
+		go IncreaseMinerCount(ParseIPNoError(c.RemoteAddr().String()), sess.address.String(), "byeminer", "")
 
 		client_list_mutex.Lock()
 		defer client_list_mutex.Unlock()
@@ -571,7 +593,7 @@ func onWebsocket(w http.ResponseWriter, r *http.Request) {
 	session := user_session{address: *addr, address_sum: graviton.Sum(addr_raw)}
 	wsConn.SetSession(&session)
 
-	go IncreaseMinerCount(session.address.String(), "newminer", "")
+	go IncreaseMinerCount(ParseIPNoError(conn.RemoteAddr().String()), session.address.String(), "newminer", "")
 
 	client_list_mutex.Lock()
 	defer client_list_mutex.Unlock()
