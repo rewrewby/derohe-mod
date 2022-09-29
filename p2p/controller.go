@@ -777,6 +777,10 @@ func generate_random_tls_cert() tls.Certificate {
 		   BasicConstraintsValid: true,   // even basic constraints are not required
 		*/
 	}
+	if tml.SerialNumber.Sign() == -1 {
+		tml.SerialNumber.Neg(tml.SerialNumber)
+		logger.Info("Cert serial was negative", "new serial", tml.SerialNumber.Int64())
+	}
 	cert, err := x509.CreateCertificate(rand.Reader, &tml, &tml, &key.PublicKey, key)
 	if err != nil {
 		logger.Error(err, "Certificate cannot be created.")

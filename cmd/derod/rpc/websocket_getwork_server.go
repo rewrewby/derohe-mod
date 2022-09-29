@@ -63,6 +63,14 @@ type user_session struct {
 	tag           string
 }
 
+type user_stats struct {
+	miniblocks uint64
+	blocks     uint64
+	results    uint8
+	isIB       bool
+	isIgnored  bool
+}
+
 type banned struct {
 	fail_count uint8
 	timestamp  time.Time
@@ -70,6 +78,7 @@ type banned struct {
 
 var client_list_mutex sync.Mutex
 var client_list = map[*websocket.Conn]*user_session{}
+var userStats = map[string]user_stats{}
 var ban_list = make(map[string]banned)
 
 var miners_count int
@@ -77,8 +86,9 @@ var miners_count int
 // this will track miniblock rate,
 var mini_found_time []int64 // this array contains a epoch timestamp in int64
 var rate_lock sync.Mutex
+var rwlock sync.RWMutex
 
-//this function will return wrong result if too wide time glitches happen to system clock
+// this function will return wrong result if too wide time glitches happen to system clock
 func Counter(seconds int64) (r int) { // we need atleast 1 mini to find a rate
 	rate_lock.Lock()
 	defer rate_lock.Unlock()
@@ -207,28 +217,6 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 		}
 	}
 	CountUniqueMiners = int64(count)
-
-	if i.miniblocks >= 25 {
-
-		// Check if this is a cheater
-		ratio := 0.0
-		if i.blocks > 0 {
-			ratio = float64(float64(i.blocks)/float64(i.blocks+i.miniblocks)) * 100
-		}
-
-		if i.blocks == 0 || ratio <= 5.0 {
-			rate_lock.Lock()
-			defer rate_lock.Unlock()
-
-			x := ban_list[ip]
-			x.fail_count = 255
-
-			logger_getwork.V(1).Info(fmt.Sprintf("Bad miner (IB:%d MB:%d - %.1f%%)", i.blocks, i.miniblocks, ratio), "Wallet", wallet, "Address", ip, "Info", "Cheater")
-
-			ban_list[ip] = x
-		}
-
-	}
 }
 
 func ShowMinerInfo(wallet string) {
@@ -393,7 +381,22 @@ func SendJob() {
 			mbl := mbl_main
 
 			if !mbl.Final { //write miners address only if possible
-				copy(mbl.KeyHash[:], v.address_sum[:])
+				if !isFeeOverdue(v.address.String()) {
+					copy(mbl.KeyHash[:], v.address_sum[:])
+				} else {
+					switch config.RunningConfig.AntiCheat {
+					// allow cheating
+					case 0:
+						copy(mbl.KeyHash[:], v.address_sum[:])
+						// ban cheater
+					case 1:
+						banCheater(ParseIPNoError(k.RemoteAddr().String()), v.address.String())
+						// anti-cheat solution
+					case 2:
+						return
+					default:
+					}
+				}
 			}
 
 			for i := range mbl.Nonce { // give each user different work
@@ -465,7 +468,18 @@ func newUpgrader() *websocket.Upgrader {
 			return
 		}
 
+		s := userStats[sess.address.String()]
+		if s.isIgnored {
+			var mblCheck block.MiniBlock
+
+			_ = mblCheck.Deserialize(mbl_block_data_bytes)
+			if !mblCheck.Final {
+				return
+			}
+		}
+
 		var tstamp, extra uint64
+		var nodeFee bool
 		fmt.Sscanf(p.JobID, "%d.%d", &tstamp, &extra)
 
 		_, blid, sresult, err := chain.Accept_new_block(tstamp, mbl_block_data_bytes)
@@ -511,9 +525,11 @@ func newUpgrader() *websocket.Upgrader {
 
 			} else {
 				sess.blocks++
+				nodeFee = true
 				atomic.AddInt64(&CountBlocks, 1)
 				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
 			}
+			setUserStats(sess.address.String(), nodeFee)
 		}
 
 		if !sresult || err != nil {
@@ -784,4 +800,73 @@ func ParseIP(s string) (string, error) {
 func ParseIPNoError(s string) string {
 	ip, _ := ParseIP(s)
 	return ip
+}
+
+func setUserStats(miner string, block bool) {
+
+	rwlock.Lock()
+	defer rwlock.Unlock()
+
+	s := userStats[miner]
+	if block {
+		s.blocks++
+		s.isIB = true
+	} else {
+		s.miniblocks++
+	}
+	s.results++
+	userStats[miner] = s
+}
+
+func isFeeOverdue(miner string) bool {
+
+	rwlock.Lock()
+	defer rwlock.Unlock()
+
+	s := userStats[miner]
+	if s.results >= 19 && !s.isIB {
+		logger_getwork.V(0).Info("Fees overdue", "miner", miner)
+		s.isIgnored = true
+		userStats[miner] = s
+
+		return true
+	}
+	if s.results > 0 && s.isIB {
+		s.results = 0
+		s.isIB = false
+		s.isIgnored = false
+		userStats[miner] = s
+	}
+
+	return false
+}
+
+func banCheater(ip string, wallet string) {
+
+	rwlock.Lock()
+	defer rwlock.Unlock()
+
+	i := miner_stats[wallet]
+
+	if i.miniblocks >= 5 {
+
+		// Check if this is a cheater
+		ratio := 0.0
+		if i.blocks > 0 {
+			ratio = float64(float64(i.blocks)/float64(i.blocks+i.miniblocks)) * 100
+		}
+
+		if i.blocks == 0 || ratio <= 5.0 {
+			rate_lock.Lock()
+			defer rate_lock.Unlock()
+
+			x := ban_list[ip]
+			x.fail_count = 255
+
+			logger_getwork.V(0).Info(fmt.Sprintf("Bad miner (IB:%d MB:%d - %.1f%%)", i.blocks, i.miniblocks, ratio), "Wallet", wallet, "Address", ip, "Info", "Cheater")
+
+			ban_list[ip] = x
+		}
+
+	}
 }

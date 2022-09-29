@@ -157,6 +157,7 @@ type RUN_CONFIG struct {
 	ErrorLogExpirySeconds  int64
 	NodeTag                string
 	NetworkStatsKeepCount  int64
+	AntiCheat              uint8
 }
 
 var RunningConfig = RUN_CONFIG{
@@ -174,4 +175,5 @@ var RunningConfig = RUN_CONFIG{
 	Min_Peers:              31,
 	Max_Peers:              101,
 	NetworkStatsKeepCount:  100,
+	AntiCheat:              2,
 }

@@ -1554,6 +1554,17 @@ restart_loop:
 					new_tag = strings.TrimRight(new_tag, " ")
 					p2p.SetNodeTag(new_tag)
 				}
+				if line_parts[1] == "anti_cheat" && len(line_parts) == 3 {
+					mode, err := strconv.Atoi(line_parts[2])
+					if err == nil {
+						if mode >= 0 && mode < 3 {
+							config.RunningConfig.AntiCheat = uint8(mode)
+							io.WriteString(l.Stdout(), fmt.Sprintf("Anti cheat mode: %d\n", mode))
+						}
+					} else {
+						io.WriteString(l.Stderr(), "anti_cheat <mode> (0 = allow, 1 = ban, 2 = enable protection)\n")
+					}
+				}
 				save_config_file()
 			}
 
