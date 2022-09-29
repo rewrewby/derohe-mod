@@ -221,9 +221,9 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 			defer rate_lock.Unlock()
 
 			x := ban_list[ip]
-			x.fail_count++
+			x.fail_count = 255
 
-			logger_getwork.V(1).Info(fmt.Sprintf("Bad miner (IB:%d MB:%d - %.1f%%)", i.blocks, i.miniblocks, ratio), wallet, "Address", ip, "Info", "Cheater")
+			logger_getwork.V(1).Info(fmt.Sprintf("Bad miner (IB:%d MB:%d - %.1f%%)", i.blocks, i.miniblocks, ratio), "Wallet", wallet, "Address", ip, "Info", "Cheater")
 
 			ban_list[ip] = x
 		}
@@ -493,9 +493,19 @@ func newUpgrader() *websocket.Upgrader {
 
 				// Reset fail count in case of valid PoW
 				for i, t := range ban_list {
-					if miner == i {
+					if miner == i && t.fail_count < 25 {
 						t.fail_count = 0
 						ban_list[miner] = t
+					}
+
+					if miner == i && t.fail_count >= 25 {
+						t.timestamp = time.Now()
+						ban_list[miner] = t
+						c.Close()
+						delete(client_list, c)
+						logger_getwork.V(1).Info("Banned miner", "Address", miner, "Info", "Banned")
+						go IncreaseMinerCount(miner, sess.address.String(), "lasterror", "Banned miner")
+
 					}
 				}
 
@@ -517,10 +527,9 @@ func newUpgrader() *websocket.Upgrader {
 				go IncreaseMinerCount(miner, sess.address.String(), "lasterror", sess.lasterr)
 			}
 
+			// Increase fail count and ban miner in case of 3 invalid PoW's in a row
 			rate_lock.Lock()
 			defer rate_lock.Unlock()
-
-			// Increase fail count and ban miner in case of 3 invalid PoW's in a row
 			i := ban_list[miner]
 			i.fail_count++
 			if i.fail_count >= 3 {
@@ -532,7 +541,9 @@ func newUpgrader() *websocket.Upgrader {
 				go IncreaseMinerCount(miner, sess.address.String(), "lasterror", "Banned miner")
 			}
 			ban_list[miner] = i
+
 		}
+
 	})
 	u.OnClose(func(c *websocket.Conn, err error) {
 

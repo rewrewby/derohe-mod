@@ -161,11 +161,11 @@ func dump(filename string) {
 	}
 }
 
-func ProcessOrphan(wallet string) {
+// func ProcessOrphan(wallet string) {
 
-	go derodrpc.IncreaseMinerCount(wallet, "orphaned", "")
+// 	go derodrpc.IncreaseMinerCount(wallet, "orphaned", "")
 
-}
+// }
 
 var threadStartCount int
 var mutexStartCount int
