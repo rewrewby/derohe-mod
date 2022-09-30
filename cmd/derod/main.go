@@ -27,7 +27,6 @@ import (
 	"math/big"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -171,6 +170,7 @@ var threadStartCount int
 var mutexStartCount int
 var blockingStartCount int
 var goStartCount int
+var logfile *lumberjack.Logger
 
 func main() {
 
@@ -212,11 +212,14 @@ func main() {
 
 	// parse arguments and setup logging , print basic information
 	exename, _ := os.Executable()
-	globals.InitializeLog(l.Stdout(), &lumberjack.Logger{
-		Filename:   path.Base(exename) + ".log",
+
+	logfile = &lumberjack.Logger{
+		Filename:   exename + ".log",
 		MaxSize:    100, // megabytes
 		MaxBackups: 2,
-	})
+	}
+
+	globals.InitializeLog(l.Stdout(), logfile)
 
 	logger = globals.Logger.WithName("derod")
 

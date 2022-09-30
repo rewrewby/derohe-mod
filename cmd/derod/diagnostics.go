@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
 	"github.com/deroproject/derohe/p2p"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var DiagnosticInterval uint64 = 1
@@ -25,19 +23,13 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 		return
 	}
 
-	exename, _ := os.Executable()
-
 	if config.RunningConfig.LogLevel > 0 {
 		logger.Info(fmt.Sprint("Disabling DEBUG (some connection might take few seconds)"))
 	}
 
 	logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
 
-	globals.SetLogLevel(l.Stdout(), &lumberjack.Logger{
-		Filename:   path.Base(exename) + "-diags.log",
-		MaxSize:    100, // megabytes
-		MaxBackups: 2,
-	}, (0 - int(log_level)))
+	globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
 
 	logger = globals.Logger.WithName("derod")
 

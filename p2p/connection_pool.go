@@ -171,14 +171,14 @@ func Connection_Pending_Clear() {
 
 		if time.Now().Sub(v.update_received).Round(time.Second).Seconds() > 20 && pending_clear_count < 10 {
 			v.exit()
-			Connection_Delete(v)
+			go Connection_Delete(v)
 			v.logger.V(1).Info(fmt.Sprintf("Purging connection (%s) since idle for %s", v.Addr.String(), time.Now().Sub(v.update_received).Round(time.Second).String()))
 			pending_clear_count++
 		}
 
 		if IsAddressInBanList(Address(v)) {
 			v.exit()
-			Connection_Delete(v)
+			go Connection_Delete(v)
 			v.logger.V(1).Info("Purging connection due to ban list")
 		}
 
