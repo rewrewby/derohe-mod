@@ -238,7 +238,7 @@ func SetLogger(newlogger *logr.Logger) {
 		c := value.(*Connection)
 
 		logger = *newlogger
-		c.logger = logger.WithName("incoming").WithName(c.Addr.String())
+		c.logger = logger.WithName("peer").WithName(c.Addr.String())
 
 		return true
 	})
