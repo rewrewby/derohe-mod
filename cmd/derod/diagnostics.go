@@ -24,10 +24,8 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 	}
 
 	if config.RunningConfig.LogLevel > 0 {
-		logger.Info(fmt.Sprint("Disabling DEBUG (some connection might take few seconds)"))
+		logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
 	}
-
-	logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
 
 	globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
 
