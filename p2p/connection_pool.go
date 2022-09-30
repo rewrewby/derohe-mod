@@ -107,6 +107,12 @@ type Connection struct {
 	Mutex sync.Mutex // used only by connection go routine
 }
 
+func ConnectionSetLogger(newlogger *logr.Logger) {
+
+	logger = *newlogger
+
+}
+
 func ConnecToNode(address string) {
 
 	go connect_with_endpoint(address, false)

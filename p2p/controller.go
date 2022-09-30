@@ -201,6 +201,12 @@ func P2P_Init(params map[string]interface{}) error {
 	return nil
 }
 
+func ControllerSetLogger(newlogger *logr.Logger) {
+
+	logger = *newlogger
+
+}
+
 // TODO we need to make sure that exclusive/priority nodes are never banned
 func P2P_engine() {
 
