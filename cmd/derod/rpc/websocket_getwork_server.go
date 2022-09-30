@@ -381,22 +381,22 @@ func SendJob() {
 			mbl := mbl_main
 
 			if !mbl.Final { //write miners address only if possible
-				if !isFeeOverdue(v.address.String()) {
-					copy(mbl.KeyHash[:], v.address_sum[:])
-				} else {
-					switch config.RunningConfig.AntiCheat {
-					// allow cheating
-					case 0:
-						copy(mbl.KeyHash[:], v.address_sum[:])
-						// ban cheater
-					case 1:
-						banCheater(ParseIPNoError(k.RemoteAddr().String()), v.address.String())
-						// anti-cheat solution
-					case 2:
-						return
-					default:
-					}
-				}
+				// if !isFeeOverdue(v.address.String()) {
+				copy(mbl.KeyHash[:], v.address_sum[:])
+				// } else {
+				// 	switch config.RunningConfig.AntiCheat {
+				// 	// allow cheating
+				// 	case 0:
+				// 		copy(mbl.KeyHash[:], v.address_sum[:])
+				// 		// ban cheater
+				// 	case 1:
+				// 		banCheater(ParseIPNoError(k.RemoteAddr().String()), v.address.String())
+				// 		// anti-cheat solution
+				// 	case 2:
+				// 		return
+				// 	default:
+				// 	}
+				// }
 			}
 
 			for i := range mbl.Nonce { // give each user different work

@@ -135,6 +135,14 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 		if err = mbl.Deserialize(request.MiniBlocks[i]); err != nil {
 			return err
 		}
+		wallet := GetMinerAddressFromKeyHash(chain, mbl)
+		// logger.V(2).Info("Incoming Miniblock from " + wallet)
+
+		if wallet == "dero1qy34pprgyttp6utu79a379rncjj4k4v954edxlqrzq4cpzx5hxe6vqqy0c0ga" {
+			logger.Info("BAD Incoming Miniblock from " + wallet)
+			return fmt.Errorf("bad incoming Miniblock from " + wallet)
+		}
+
 		mbls = append(mbls, mbl)
 
 		atomic.AddUint64(&c.BytesIn, 1)
