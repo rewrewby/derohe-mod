@@ -537,6 +537,7 @@ func P2P_Server_v2() {
 		//connection.logger.Info("connected  OnConnect")
 		go func() {
 			time.Sleep(2 * time.Second)
+			connection.logger = logger.WithName("incoming").WithName(remote_addr.String())
 			connection.dispatch_test_handshake()
 		}()
 
