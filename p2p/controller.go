@@ -56,7 +56,14 @@ var P2P_Port int // this will be exported while doing handshake
 var Exit_Event = make(chan bool) // causes all threads to exit
 var Exit_In_Progress bool        // marks we are doing exit
 var logger logr.Logger           // global logger, every logger in this package is a child of this
-var sync_node bool               // whether sync mode is activated
+
+func ControllerSetLogger() {
+
+	logger = globals.Logger.WithName("P2P")
+
+}
+
+var sync_node bool // whether sync mode is activated
 
 var nonbanlist []string // any ips in this list will never be banned
 // the list will include seed nodes, any nodes provided at command prompt
@@ -199,12 +206,6 @@ func P2P_Init(params map[string]interface{}) error {
 	logger.Info("P2P started")
 	atomic.AddUint32(&globals.Subsystem_Active, 1) // increment subsystem
 	return nil
-}
-
-func ControllerSetLogger(newlogger *logr.Logger) {
-
-	logger = *newlogger
-
 }
 
 // TODO we need to make sure that exclusive/priority nodes are never banned
@@ -529,7 +530,7 @@ func P2P_Server_v2() {
 		tlsconn := tlsconn_interface.(net.Conn)
 
 		connection := &Connection{Client: c, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: true}
-		connection.logger = logger.WithName("incoming").WithName(remote_addr.String())
+		connection.logger = logger.WithName(remote_addr.String())
 
 		in, out := Peer_Direction_Count()
 
@@ -543,7 +544,7 @@ func P2P_Server_v2() {
 		//connection.logger.Info("connected  OnConnect")
 		go func() {
 			time.Sleep(2 * time.Second)
-			connection.logger = logger.WithName("incoming").WithName(remote_addr.String())
+			connection.logger = logger.WithName(remote_addr.String())
 			connection.dispatch_test_handshake()
 		}()
 

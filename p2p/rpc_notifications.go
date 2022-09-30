@@ -99,6 +99,7 @@ func (c *Connection) NotifyINV(request ObjectList, response *Dummy) (err error) 
 		defer cancel()
 
 		if err = c.Client.CallWithContext(ctx, "Peer.GetObject", need, &oresponse); err != nil {
+			c.logger = logger.WithName(c.Addr.String())
 			c.logger.V(2).Error(err, "Call failed GetObject", "need_objects", need)
 			c.exit()
 			return

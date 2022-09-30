@@ -34,7 +34,7 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 	p2p_logger := globals.Logger.WithName("P2P")
 	p2p.SetLogger(&p2p_logger)
 	p2p.ConnectionSetLogger(&p2p_logger)
-	p2p.ControllerSetLogger(&p2p_logger)
+	p2p.ControllerSetLogger()
 
 	core_logger := globals.Logger.WithName("CORE")
 	blockchain.SetLogger(&core_logger)
