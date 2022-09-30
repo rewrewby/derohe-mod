@@ -232,6 +232,8 @@ func SetLogger(newlogger *logr.Logger) {
 	peer_mutex.Lock()
 	defer peer_mutex.Unlock()
 
+	logger = *newlogger
+
 	connection_map.Range(func(k, value interface{}) bool {
 		c := value.(*Connection)
 

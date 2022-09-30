@@ -82,9 +82,7 @@ func shouldwebackoff(ip string) bool {
 		}
 	}
 
-	_, backoff_ip := backoff[ip]
-
-	if backoff_ip { // now lets do the test
+	if backoff[ip] != 0 { // now lets do the test
 		return true
 	}
 	return false
@@ -101,15 +99,13 @@ func P2P_Init(params map[string]interface{}) error {
 	// parse node tag if availble
 	if _, ok := globals.Arguments["--node-tag"]; ok {
 		if globals.Arguments["--node-tag"] != nil {
-			SetNodeTag(globals.Arguments["--node-tag"].(string))
+			node_tag = globals.Arguments["--node-tag"].(string)
 		}
 	}
 	if os.Getenv("TURBO") == "0" {
 		logger.Info("P2P is in normal mode")
-		config.RunningConfig.P2PTurbo = false
 	} else {
 		logger.Info("P2P is in turbo mode")
-		config.RunningConfig.P2PTurbo = true
 	}
 
 	if os.Getenv("BW_FACTOR") != "" {
@@ -117,9 +113,7 @@ func P2P_Init(params map[string]interface{}) error {
 		if bw_factor <= 0 {
 			bw_factor = 1
 		}
-
 		logger.Info("", "BW_FACTOR", bw_factor)
-		config.RunningConfig.P2PBWFactor = int64(bw_factor)
 	}
 
 	if os.Getenv("UDP_READ_BUF_CONN") != "" {
@@ -142,10 +136,8 @@ func P2P_Init(params map[string]interface{}) error {
 	}
 
 	chain = params["chain"].(*blockchain.Blockchain)
-	load_ban_list() // load ban list
-	load_permban_list()
-	load_peer_list()  // load old list if availble
-	load_trust_list() // load trusted peers from file
+	load_ban_list()  // load ban list
+	load_peer_list() // load old list if availble
 
 	// if user provided a sync node, connect with it
 	if _, ok := globals.Arguments["--sync-node"]; ok { // check if parameter is supported
@@ -170,10 +162,6 @@ func P2P_Init(params map[string]interface{}) error {
 	globals.Cron.AddFunc("@every 5s", Connection_Pending_Clear) // clean dead connections
 	globals.Cron.AddFunc("@every 10s", ping_loop)               // ping every one
 	globals.Cron.AddFunc("@every 10s", chunks_clean_up)         // clean chunks
-	globals.Cron.AddFunc("@every 60s", save_peer_list)          // save peer list so we can use it for monitoring
-	globals.Cron.AddFunc("@every 60s", save_ban_list)           // save peer list so we can use it for monitoring
-	globals.Cron.AddFunc("@every 60s", save_permban_list)       // save permban list
-	globals.Cron.AddFunc("@every 60s", ClearPeerLogsCron)       // cleanup running peer logs
 
 	go time_check_routine() // check whether server time is in sync using ntp
 
@@ -287,7 +275,7 @@ func P2P_engine() {
 
 func tunekcp(conn *kcp.UDPSession) {
 	conn.SetACKNoDelay(true)
-	if config.RunningConfig.P2PTurbo {
+	if os.Getenv("TURBO") == "0" {
 		conn.SetNoDelay(1, 10, 2, 1) // tuning paramters for local stack for fast retransmission stack
 	} else {
 		conn.SetNoDelay(0, 40, 0, 0) // tuning paramters for local
@@ -461,7 +449,6 @@ func maintain_connection_to_peers() {
 				logger.Error(fmt.Errorf("--min-peers should be positive and more than 1"), "")
 			} else {
 				Min_Peers = i
-				config.RunningConfig.Min_Peers = Min_Peers
 			}
 		}
 		logger.Info("Min peers", "min-peers", Min_Peers)
@@ -476,15 +463,9 @@ func maintain_connection_to_peers() {
 				logger.Error(fmt.Errorf("--max-peers should be positive and more than --min-peers"), "")
 			} else {
 				Max_Peers = i
-				config.RunningConfig.Max_Peers = Max_Peers
 			}
 		}
 		logger.Info("Max peers", "max-peers", Max_Peers)
-	}
-
-	// check max and min peers are alligned
-	if Min_Peers > Max_Peers {
-		Max_Peers = Min_Peers
 	}
 
 	delay := time.NewTicker(200 * time.Millisecond)
@@ -498,8 +479,8 @@ func maintain_connection_to_peers() {
 
 		// check number of connections, if limit is reached, trigger new connections if we have peers
 		// if we have more do nothing
-		in, out := Peer_Direction_Count()
-		if out+in >= uint64(Max_Peers) { // we already have required number of peers, donot connect to more peers
+		_, out := Peer_Direction_Count()
+		if out >= uint64(Min_Peers) { // we already have required number of peers, donot connect to more peers
 			continue
 		}
 
@@ -512,7 +493,7 @@ func maintain_connection_to_peers() {
 
 func P2P_Server_v2() {
 
-	var accept_limiter = rate.NewLimiter(100.0, 40) // 10 incoming per sec, burst of 40 is okay
+	var accept_limiter = rate.NewLimiter(10.0, 40) // 10 incoming per sec, burst of 40 is okay
 
 	default_address := "0.0.0.0:0" // be default choose a random port
 	if _, ok := globals.Arguments["--p2p-bind"]; ok && globals.Arguments["--p2p-bind"] != nil {
@@ -557,7 +538,6 @@ func P2P_Server_v2() {
 		go func() {
 			time.Sleep(2 * time.Second)
 			connection.dispatch_test_handshake()
-
 		}()
 
 	})
@@ -607,7 +587,7 @@ func P2P_Server_v2() {
 		raddr := conn.RemoteAddr().(*net.UDPAddr)
 
 		backoff_mutex.Lock()
-		backoff[ParseIPNoError(raddr.String())] = time.Now().Unix() + 10
+		backoff[ParseIPNoError(raddr.String())] = time.Now().Unix() + globals.Global_Random.Int63n(200) // random backing of upto 200 secs
 		backoff_mutex.Unlock()
 
 		logger.V(3).Info("accepting incoming connection", "raddr", raddr.String())
@@ -615,12 +595,10 @@ func P2P_Server_v2() {
 		if IsAddressConnected(ParseIPNoError(raddr.String())) {
 			logger.V(4).Info("incoming address is already connected", "ip", raddr.String())
 			conn.Close()
-			continue
 
 		} else if IsAddressInBanList(ParseIPNoError(raddr.IP.String())) { //if incoming IP is banned, disconnect now
 			logger.V(2).Info("Incoming IP is banned, disconnecting now", "IP", raddr.IP.String())
 			conn.Close()
-			continue
 		}
 
 		tunekcp(conn) // tuning paramters for local stack
@@ -711,6 +689,7 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 
 	go func() {
 		time.Sleep(2 * time.Second)
+		c.logger = logger.WithName("outgoing").WithName(remote_addr.String())
 		c.dispatch_test_handshake()
 	}()
 
@@ -776,10 +755,6 @@ func generate_random_tls_cert() tls.Certificate {
 		   },
 		   BasicConstraintsValid: true,   // even basic constraints are not required
 		*/
-	}
-	if tml.SerialNumber.Sign() == -1 {
-		tml.SerialNumber.Neg(tml.SerialNumber)
-		logger.Info("Cert serial was negative", "new serial", tml.SerialNumber.Int64())
 	}
 	cert, err := x509.CreateCertificate(rand.Reader, &tml, &tml, &key.PublicKey, key)
 	if err != nil {
