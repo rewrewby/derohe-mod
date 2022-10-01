@@ -16,14 +16,7 @@ import (
 	"os"
 	"time"
 
-	"etcd.io/bbolt"
-	"github.com/deroproject/derohe/globals"
-	"github.com/deroproject/derohe/rpc"
-	"github.com/deroproject/derohe/walletapi"
-	"github.com/go-logr/logr"
-	"github.com/ybbus/jsonrpc"
-	"gopkg.in/natefinch/lumberjack.v2"
-)
+import "go.etcd.io/bbolt"
 
 // needed for logs
 
@@ -38,8 +31,8 @@ var expected_arguments = rpc.Arguments{
 	// { Name:rpc.RPC_EXPIRY , DataType:rpc.DataTime, Value:time.Now().Add(time.Hour).UTC()},
 	{Name: rpc.RPC_COMMENT, DataType: rpc.DataString, Value: "Purchase PONG"},
 	//{"float64", rpc.DataFloat64, float64(0.12345)},          // in atomic units
-	//	{Name:rpc.RPC_NEEDS_REPLYBACK_ADDRESS,DataType:rpc.DataUint64,Value:uint64(0)},  // this service will reply to incoming request,so needs the senders address
-	{Name: rpc.RPC_VALUE_TRANSFER, DataType: rpc.DataUint64, Value: uint64(12345)}, // in atomic units
+	{Name: rpc.RPC_NEEDS_REPLYBACK_ADDRESS, DataType: rpc.DataUint64, Value: uint64(0)}, // this service will reply to incoming request,so needs the senders address
+	{Name: rpc.RPC_VALUE_TRANSFER, DataType: rpc.DataUint64, Value: uint64(12345)},      // in atomic units
 
 }
 
@@ -169,16 +162,23 @@ func processing_thread(db *bbolt.DB) {
 					continue
 				}
 
-				/*	if !e.Payload_RPC.Has(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress){
-						logger.Error(nil, fmt.Sprintf("user has not give his address so we cannot replyback")) // this is an unexpected situation
-						continue
-					}
+				if !e.Payload_RPC.Has(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress) {
+					logger.Error(nil, fmt.Sprintf("user has not give his address so we cannot replyback")) // this is an unexpected situation
+					continue
+				}
 
-					destination_expected := e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String()
+				destination_expected := e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String()
+				addr, err := rpc.NewAddress(destination_expected)
+				if err != nil {
+					logger.Error(err, "err while while parsing incoming addr")
+					continue
+				}
+				addr.Mainnet = false // convert addresses to testnet form, by default it's expected to be mainnnet
+				destination_expected = addr.String()
 
-					logger.V(1).Info("tx should be replied", "txid", e.TXID,"replyback_address",destination_expected)
-				*/
-				destination_expected := e.Sender
+				logger.V(1).Info("tx should be replied", "txid", e.TXID, "replyback_address", destination_expected)
+
+				//destination_expected := e.Sender
 
 				// value received is what we are expecting, so time for response
 				response[0].Value = e.SourcePort // source port now becomes destination port, similar to TCP

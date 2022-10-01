@@ -169,7 +169,7 @@ type (
 	}
 )
 
-//get encrypted balance call
+// get encrypted balance call
 type (
 	GetEncryptedBalance_Params struct {
 		Address                 string      `json:"address"`
@@ -292,6 +292,7 @@ type (
 	}
 	SendRawTransaction_Result struct {
 		Status string `json:"status"`
+		TXID   string `json:"txid"`
 		Reason string `json:"string"`
 	}
 )

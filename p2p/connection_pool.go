@@ -462,6 +462,7 @@ func broadcast_Block_Coded(cbl *block.Complete_Block, PeerID uint64, first_seen 
 
 	our_height := chain.Get_Height()
 	// build the request once and dispatch it to all possible peers
+	tries := 0
 	count := 0
 	unique_map := UniqueConnections()
 
@@ -491,6 +492,11 @@ func broadcast_Block_Coded(cbl *block.Complete_Block, PeerID uint64, first_seen 
 				return
 			default:
 			}
+
+			if tries > 1024 {
+				return
+			}
+			tries++
 			if atomic.LoadUint32(&v.State) != HANDSHAKE_PENDING && PeerID != v.Peer_ID && v.Peer_ID != GetPeerID() { // skip pre-handshake connections
 
 				// if the other end is > 2 blocks behind, do not broadcast block to him
