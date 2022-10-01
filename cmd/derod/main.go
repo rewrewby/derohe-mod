@@ -975,6 +975,7 @@ restart_loop:
 			fmt.Printf("DERO 🥷 Daemon - Threads [%d/%d] - Mutex [%d/%d] - Blocked [%d/%d] - GO Procs [%d/%d]\n",
 				threadStartCount, globals.CountThreads(), mutexStartCount, globals.CountMutex(),
 				blockingStartCount, globals.CountBlocked(), goStartCount, globals.CountGoProcs())
+			fmt.Printf("Version: %s\n\n", config.Version.String())
 
 			fmt.Printf("Network %s Height %d  NW Hashrate %0.03f MH/sec  Peers %d inc, %d out  MEMPOOL size %d REGPOOL %d  Total Supply %s DERO \n", globals.Config.Name, chain.Get_Height(), float64(chain.Get_Network_HashRate())/1000000.0, inc, out, mempool_tx_count, regpool_tx_count, globals.FormatMoney(supply))
 
