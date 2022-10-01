@@ -192,7 +192,7 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 
 	if counter == "miniblocks" {
 		i.miniblocks++
-		logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO mini block\t(going to submit)", chain.Get_Height(), wallet))
+		logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO mini block\t(going to submit)", chain.Get_Height()+1, wallet))
 	}
 
 	if counter == "rejected" {
