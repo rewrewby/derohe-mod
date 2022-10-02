@@ -497,6 +497,8 @@ func (chain *Blockchain) Accept_new_block(tstamp uint64, miniblock_blob []byte) 
 			//fmt.Printf("miniblock %s inserted successfully, total %d\n",mblid,len(chain.MiniBlocks.Collection) )
 			result = true
 
+			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+
 			// notify peers, we have a miniblock and return to miner
 			if !chain.simulator { // if not in simulator mode, relay miniblock to the chain
 				go chain.P2P_MiniBlock_Relayer(mbl, 0)
@@ -560,6 +562,10 @@ func (chain *Blockchain) Accept_new_block(tstamp uint64, miniblock_blob []byte) 
 	err, result_block = chain.Add_Complete_Block(cbl)
 
 	if result_block {
+
+		// Reset counter
+		globals.MiniBlocksCollectionCount = 0
+
 		duplicate_height_check[bl.Height] = true
 
 		cache_block_mutex.Lock()

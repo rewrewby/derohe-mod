@@ -416,7 +416,7 @@ func main() {
 						}
 					}
 
-					testnet_string += " " + strconv.Itoa(chain.MiniBlocks.Count()) + " " + globals.GetOffset().Round(time.Millisecond).String() + "|" + globals.GetOffsetNTP().Round(time.Millisecond).String() + "|" + globals.GetOffsetP2P().Round(time.Millisecond).String()
+					testnet_string += fmt.Sprintf(" %d/", globals.MiniBlocksCollectionCount) + strconv.Itoa(chain.MiniBlocks.Count()) + " " + globals.GetOffset().Round(time.Millisecond).String() + "|" + globals.GetOffsetNTP().Round(time.Millisecond).String() + "|" + globals.GetOffsetP2P().Round(time.Millisecond).String()
 
 					good_blocks := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
 

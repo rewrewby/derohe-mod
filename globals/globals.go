@@ -77,6 +77,8 @@ var mutexProfile = pprof.Lookup("mutex")
 var blockingProfile = pprof.Lookup("block")
 var goProfile = pprof.Lookup("goroutine")
 
+var MiniBlocksCollectionCount uint8
+
 func CountThreads() int {
 	return threadProfile.Count()
 }

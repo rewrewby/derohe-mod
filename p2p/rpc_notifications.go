@@ -143,8 +143,6 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 		go LogMiniblock(mbl, c.Addr.String())
 	}
 
-	var valid_found bool
-
 	for _, mbl := range mbls {
 		var ok bool
 
@@ -202,11 +200,13 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			go LogReject(c.Addr.String())
 			return err
 		} else { // rebroadcast miniblock
-			valid_found = true
+
+			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+
+			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
+
 			go LogAccept(c.Addr.String())
-			if valid_found {
-				broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
-			}
+
 		}
 	}
 
