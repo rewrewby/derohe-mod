@@ -317,20 +317,21 @@ func ListMiners() {
 			success_rate = float64(0)
 		}
 
+		hashrate := MinerHashrate(wallet)
 		hash_rate_string := ""
 
-		// switch {
-		// case stat.hashrate > 1000000000000:
-		// 	hash_rate_string = fmt.Sprintf("%.3f TH/s", float64(stat.hashrate)/1000000000000.0)
-		// case stat.hashrate > 1000000000:
-		// 	hash_rate_string = fmt.Sprintf("%.3f GH/s", float64(stat.hashrate)/1000000000.0)
-		// case stat.hashrate > 1000000:
-		// 	hash_rate_string = fmt.Sprintf("%.3f MH/s", float64(stat.hashrate)/1000000.0)
-		// case stat.hashrate > 1000:
-		// 	hash_rate_string = fmt.Sprintf("%.3f KH/s", float64(stat.hashrate)/1000.0)
-		// case stat.hashrate > 0:
-		// 	hash_rate_string = fmt.Sprintf("%d H/s", int(stat.hashrate))
-		// }
+		switch {
+		case hashrate > 1000000000000:
+			hash_rate_string = fmt.Sprintf("%.3f TH/s", float64(hashrate)/1000000000000.0)
+		case hashrate > 1000000000:
+			hash_rate_string = fmt.Sprintf("%.3f GH/s", float64(hashrate)/1000000000.0)
+		case hashrate > 1000000:
+			hash_rate_string = fmt.Sprintf("%.3f MH/s", float64(hashrate)/1000000.0)
+		case hashrate > 1000:
+			hash_rate_string = fmt.Sprintf("%.3f KH/s", float64(hashrate)/1000.0)
+		case hashrate > 0:
+			hash_rate_string = fmt.Sprintf("%d H/s", int(hashrate))
+		}
 
 		success_rate_str := fmt.Sprintf("%.2f%%", success_rate)
 
@@ -434,6 +435,56 @@ func SendJob() {
 	}
 }
 
+var hashrate_lock sync.Mutex
+
+type MinersHashrate struct {
+	hashrate float64
+	wallet   string
+}
+
+var MinerHashrateMap = make(map[string]MinersHashrate)
+
+func DeleteMinerHashrate(connection string) {
+
+	hashrate_lock.Lock()
+	defer hashrate_lock.Unlock()
+
+	// logger.V(1).Info(fmt.Sprintf("Deleting Miner (%s) Hashrate", connection))
+
+	delete(MinerHashrateMap, connection)
+
+}
+
+func SubmitMinerHashrate(connection string, miner string, hashrate float64) {
+
+	hashrate_lock.Lock()
+	defer hashrate_lock.Unlock()
+
+	// logger.V(1).Info(fmt.Sprintf("Saving Miner (%s / %s) Hashrate (%f)", connection, miner, hashrate))
+
+	x := MinerHashrateMap[connection]
+	x.hashrate = hashrate
+	x.wallet = miner
+	MinerHashrateMap[connection] = x
+
+}
+
+func MinerHashrate(miner string) (hashrate float64) {
+
+	hashrate_lock.Lock()
+	defer hashrate_lock.Unlock()
+
+	for _, stat := range MinerHashrateMap {
+		// logger.V(1).Info(fmt.Sprintf("Checking %s vs %s", stat.wallet, miner))
+
+		if stat.wallet == miner {
+			hashrate += stat.hashrate
+		}
+	}
+
+	return hashrate
+}
+
 func newUpgrader() *websocket.Upgrader {
 	u := websocket.NewUpgrader()
 
@@ -455,7 +506,7 @@ func newUpgrader() *websocket.Upgrader {
 		if json.Unmarshal(data, &x); len(x.Wallet_Address) > 0 {
 			// Update miners information
 			//logger.V(2).Info(fmt.Sprintf("IP: %-22s Speed: %-14f Tag: %-22s Address: %s", c.RemoteAddr().String(), x.Miner_Hashrate, x.Miner_Tag, x.Wallet_Address))
-			sess.hashrate = x.Miner_Hashrate
+			go SubmitMinerHashrate(c.RemoteAddr().String(), x.Wallet_Address, x.Miner_Hashrate)
 			sess.tag = x.Miner_Tag
 			return
 		}
@@ -578,7 +629,7 @@ func newUpgrader() *websocket.Upgrader {
 
 		sess := c.Session().(*user_session)
 		go IncreaseMinerCount(ParseIPNoError(c.RemoteAddr().String()), sess.address.String(), "byeminer", "")
-
+		go DeleteMinerHashrate(c.RemoteAddr().String())
 		client_list_mutex.Lock()
 		defer client_list_mutex.Unlock()
 		delete(client_list, c)
