@@ -19,9 +19,12 @@ var DiagnosticInterval uint64 = 1
 
 func DebugPeer(l *readline.Instance, Address string, log_level int8) {
 
+	Address = p2p.ParseIPNoError(Address)
+
 	peer_log := globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
 
 	p2p.SetLogger(&peer_log, Address)
+	p2p.AddPeerTraceList(Address)
 
 }
 
@@ -33,6 +36,8 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 
 	if config.RunningConfig.LogLevel > 0 {
 		logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
+	} else {
+		p2p.ClearTraceList()
 	}
 
 	new_logger := globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))

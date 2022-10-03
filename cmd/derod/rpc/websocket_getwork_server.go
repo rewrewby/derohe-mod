@@ -170,6 +170,12 @@ type inner_miner_stats struct {
 var miner_stats_mutex sync.Mutex
 var miner_stats = make(map[string]inner_miner_stats)
 
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
+
 func IncreaseMinerCount(ip string, wallet string, counter string, argument string) {
 
 	miner_stats_mutex.Lock()
@@ -187,12 +193,12 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 
 	if counter == "blocks" {
 		i.blocks++
-		logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO integrator block\t(going to submit)", chain.Get_Height(), wallet))
+		logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+blue+"("+green+"going to submit"+blue+")"+reset_color, chain.Get_Height(), wallet))
 	}
 
 	if counter == "miniblocks" {
 		i.miniblocks++
-		logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO mini block\t(going to submit)", chain.Get_Height()+1, wallet))
+		logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+green+"Successfully found DERO mini block\t"+blue+"("+green+"going to submit"+blue+")"+reset_color, chain.Get_Height()+1, wallet))
 	}
 
 	if counter == "rejected" {

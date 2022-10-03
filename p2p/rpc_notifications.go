@@ -32,6 +32,13 @@ import (
 	"github.com/deroproject/derohe/transaction"
 )
 
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
+var last_height uint64 = 0
+
 // handles notifications of inventory
 func (c *Connection) NotifyINV(request ObjectList, response *Dummy) (err error) {
 	defer handle_connection_panic(c)
@@ -207,13 +214,15 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			if config.RunningConfig.TraceBlocks {
 				wallet := GetMinerAddressFromKeyHash(chain, mbl)
 
-				orphan := ""
-
-				if globals.MiniBlocksCollectionCount >= 9 {
-					orphan = "(orphan)"
+				text_color := green
+				if globals.MiniBlocksCollectionCount > 9 {
+					text_color = yellow
 				}
 
-				logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO mini block %s", mbl.Height, wallet, orphan))
+				wallet_color := blue
+
+				// check if wallet is local and make green
+				logger.Info(fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+" - "+wallet_color+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block", mbl.Height, wallet))
 			}
 
 			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
@@ -280,7 +289,16 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 		if config.RunningConfig.TraceBlocks {
 
 			wallet := GetIntegratorAddressFromKeyHash(chain, bl)
-			logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO integrator block", bl.Height, wallet))
+
+			text_color := green
+			if last_height == bl.Height {
+				// Display orphans as yellow
+				text_color = yellow
+			}
+
+			last_height = bl.Height
+			logger.Info(fmt.Sprintf(text_color+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+text_color+"Successfully found DERO integrator block", last_height, wallet))
+
 		}
 
 	} else { // ban the peer for sometime

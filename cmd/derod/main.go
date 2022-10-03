@@ -538,8 +538,8 @@ restart_loop:
 	for {
 		line, err := l.Readline()
 		if err == io.EOF {
-			<-Exit_In_Progress
-			return nil
+			logger.Info("Ctrl-d received, to exit type - exit")
+			continue
 		}
 
 		if err == readline.ErrInterrupt {

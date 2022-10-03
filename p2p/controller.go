@@ -309,29 +309,37 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 
 	defer globals.Recover(2)
 
+	local_logger := logger
+
+	if IsPeerTraced(endpoint) {
+		local_logger = peer_logger
+	}
+
 	remote_ip, err := net.ResolveUDPAddr("udp", endpoint)
 	if err != nil {
-		logger.V(3).Error(err, "Resolve address failed:", "endpoint", endpoint)
+		local_logger.V(3).Error(err, "Resolve address failed:", "endpoint", endpoint)
 		return
 	}
 
-	if IsAddressInBanList(ParseIPNoError(remote_ip.IP.String())) {
-		logger.V(2).Info("Connecting to banned IP is prohibited", "IP", remote_ip.IP.String())
+	ip := ParseIPNoError(remote_ip.String())
+
+	if IsAddressInBanList(ip) {
+		local_logger.V(2).Info("Connecting to banned IP is prohibited", "IP", remote_ip.IP.String())
 		return
 	}
 
 	// check whether are already connected to this address if yes, return
-	if IsAddressConnected(ParseIPNoError(remote_ip.String())) {
-		logger.V(4).Info("outgoing address is already connected", "ip", remote_ip.String())
+	if IsAddressConnected(ip) {
+		local_logger.V(4).Info("outgoing address is already connected", "ip", remote_ip.String())
 		return //nil, fmt.Errorf("Already connected")
 	}
 
-	if shouldwebackoff(ParseIPNoError(remote_ip.String())) {
-		logger.V(1).Info("backing off from this connection", "ip", remote_ip.String())
+	if shouldwebackoff(ip) {
+		local_logger.V(1).Info("backing off from this connection", "ip", remote_ip.String())
 		return
 	} else {
 		backoff_mutex.Lock()
-		backoff[ParseIPNoError(remote_ip.String())] = time.Now().Unix() + 10
+		backoff[ip] = time.Now().Unix() + 10
 		backoff_mutex.Unlock()
 	}
 
@@ -390,7 +398,7 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 
 	if err != nil {
 		logger.V(3).Error(err, "Dial failed", "endpoint", endpoint)
-		Peer_SetFail(ParseIPNoError(remote_ip.String())) // update peer list as we see
+		Peer_SetFail(ip) // update peer list as we see
 		conn.Close()
 		return //nil, fmt.Errorf("Dial failed err %s", err.Error())
 	}
@@ -531,6 +539,11 @@ func P2P_Server_v2() {
 
 		connection := &Connection{Client: c, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: true}
 		connection.logger = logger.WithName(remote_addr.String())
+
+		if IsPeerTraced(remote_addr.String()) {
+			logger.Info("Traced Peer - Reconnects")
+			connection.logger = peer_logger.WithName(remote_addr.String())
+		}
 
 		in, out := Peer_Direction_Count()
 

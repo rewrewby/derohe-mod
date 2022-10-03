@@ -177,6 +177,48 @@ func GetPeerInList(address string) *Peer {
 	return nil
 }
 
+var PeerTraceList []string
+var trace_lock sync.Mutex
+
+func ClearTraceList() {
+
+	var NewList []string
+
+	trace_lock.Lock()
+	defer trace_lock.Unlock()
+	PeerTraceList = NewList
+
+}
+
+func AddPeerTraceList(Address string) {
+
+	Address = ParseIPNoError(Address)
+
+	if IsPeerTraced(Address) {
+		return
+	}
+
+	logger.Info(fmt.Sprintf("PEER: %s - Added to Trace List", Address))
+	trace_lock.Lock()
+	defer trace_lock.Unlock()
+	PeerTraceList = append(PeerTraceList, Address)
+
+}
+
+func IsPeerTraced(ip string) bool {
+	trace_lock.Lock()
+	defer trace_lock.Unlock()
+
+	found := false
+	for _, peer := range PeerTraceList {
+		if peer == ParseIPNoError(ip) {
+			found = true
+		}
+	}
+
+	return found
+}
+
 // add connection to  map
 func Peer_Add(p *Peer) {
 	clean_up()
@@ -227,12 +269,14 @@ func Peer_Add(p *Peer) {
 
 }
 
+var peer_logger logr.Logger
+
 func SetLogger(newlogger *logr.Logger, Address string) {
 
 	peer_mutex.Lock()
 	defer peer_mutex.Unlock()
 
-	// logger = *newlogger
+	peer_logger = *newlogger
 
 	Address = ParseIPNoError(Address)
 
