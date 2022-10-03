@@ -1120,12 +1120,12 @@ restart_loop:
 
 			}
 
-		case command == "debug":
+		case command == "debug_peer":
 
 			log_level := int8(5)
 			if len(line_parts) >= 2 {
 
-				if len(line_parts) == 2 {
+				if len(line_parts) == 3 {
 					i, err := strconv.ParseInt(line_parts[2], 10, 64)
 					if err != nil {
 						io.WriteString(l.Stderr(), "usage: debug <ip> [log level]\n")

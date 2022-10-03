@@ -232,7 +232,7 @@ func SetLogger(newlogger *logr.Logger, Address string) {
 	peer_mutex.Lock()
 	defer peer_mutex.Unlock()
 
-	logger = *newlogger
+	// logger = *newlogger
 
 	Address = ParseIPNoError(Address)
 
@@ -244,8 +244,8 @@ func SetLogger(newlogger *logr.Logger, Address string) {
 			return true
 		}
 
-		logger = *newlogger
-		c.logger = logger.WithName(c.Addr.String())
+		new_logger := *newlogger
+		c.logger = new_logger.WithName(c.Addr.String())
 		connection_map.Store(k, c)
 
 		if len(Address) >= 7 && ip == Address {
