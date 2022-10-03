@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/cryptography/crypto"
 	"github.com/deroproject/derohe/errormsg"
 	"github.com/deroproject/derohe/globals"
@@ -203,6 +204,18 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 
 			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
 
+			if config.RunningConfig.TraceBlocks {
+				wallet := GetMinerAddressFromKeyHash(chain, mbl)
+
+				orphan := ""
+
+				if globals.MiniBlocksCollectionCount >= 9 {
+					orphan = "(orphan)"
+				}
+
+				logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO mini block %s", mbl.Height, wallet, orphan))
+			}
+
 			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
 
 			go LogAccept(c.Addr.String())
@@ -263,6 +276,12 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 		// notify all peers
 		Broadcast_Block(&cbl, c.Peer_ID) // do not send back to the original peer
 		go LogAccept(c.Addr.String())
+
+		if config.RunningConfig.TraceBlocks {
+
+			wallet := GetIntegratorAddressFromKeyHash(chain, bl)
+			logger.Info(fmt.Sprintf("Height: %d - %s: Successfully found DERO integrator block", bl.Height, wallet))
+		}
 
 	} else { // ban the peer for sometime
 		c.logger.Error(err, "Error adding block from peer...")

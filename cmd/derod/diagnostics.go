@@ -27,7 +27,7 @@ func DebugPeer(l *readline.Instance, Address string, log_level int8) {
 
 func ToggleDebug(l *readline.Instance, log_level int8) {
 
-	if config.RunningConfig.LogLevel == log_level {
+	if config.RunningConfig.LogLevel == log_level && log_level != 0 {
 		return
 	}
 
@@ -35,16 +35,16 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 		logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
 	}
 
-	globals.Logger = globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
+	new_logger := globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
 
-	logger = globals.Logger.WithName("derod")
+	logger = new_logger.WithName("derod")
 
 	// p2p_logger := globals.Logger.WithName("P2P")
-	p2p.SetLogger(&globals.Logger, "")
-	p2p.ControllerSetLogger(&globals.Logger)
-	p2p.ConnectionSetLogger(&globals.Logger)
+	p2p.SetLogger(&new_logger, "")
+	p2p.ControllerSetLogger(&new_logger)
+	p2p.ConnectionSetLogger(&new_logger)
 
-	core_logger := globals.Logger.WithName("CORE")
+	core_logger := new_logger.WithName("CORE")
 	blockchain.SetLogger(&core_logger)
 
 	logger.V(1).Info("Debug (ENABLED)")

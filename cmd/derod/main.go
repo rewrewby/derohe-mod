@@ -1120,6 +1120,16 @@ restart_loop:
 
 			}
 
+		case command == "show_new_blocks":
+
+			if config.RunningConfig.TraceBlocks {
+				config.RunningConfig.TraceBlocks = false
+				logger.Info("Disabling Block Tracing")
+			} else {
+				config.RunningConfig.TraceBlocks = true
+				logger.Info("Enabling Block Tracing")
+			}
+
 		case command == "debug_peer":
 
 			log_level := int8(5)
@@ -2077,7 +2087,8 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mactive_miners\033[0m\tShow Active Miners on Network\n")
 	io.WriteString(w, "\t\033[1mactive_nodes\033[0m\tShow Active Mining Nodes\n")
 	io.WriteString(w, "\t\033[1mshow_selfish\033[0m\tShow Nodes that don't play nice\n")
-
+	io.WriteString(w, "\t\033[1mdebug_peer\033[0m\tChange log level only for single peer connect - debug_peerl <ip> [log level - default 5]\n")
+	io.WriteString(w, "\t\033[1mshow_new_blocks\033[0m\tDisplay notifcation of new blocks and mini blocks as node sees them\n")
 }
 
 var completer = readline.NewPrefixCompleter(
@@ -2112,6 +2123,7 @@ var completer = readline.NewPrefixCompleter(
 	readline.PcItem("peer_info"),
 	readline.PcItem("debug"),
 	readline.PcItem("debug_peer"),
+	readline.PcItem("show_new_blocks"),
 	readline.PcItem("run_diagnostics"),
 	readline.PcItem("permban"),
 	readline.PcItem("config"),

@@ -94,6 +94,22 @@ func GetBlockLogLenght() (int, int) {
 
 }
 
+func GetIntegratorAddressFromKeyHash(chain *blockchain.Blockchain, bl block.Block) string {
+
+	// if toporecord, err1 := chain.Store.Topo_store.Read(chain.Get_Height()); err1 == nil { // we must now fill in compressed ring members
+	// if ss, err1 := chain.Store.Balance_store.LoadSnapshot(toporecord.State_Version); err1 == nil {
+
+	if addr, err1 := rpc.NewAddressFromCompressedKeys(bl.Miner_TX.MinerAddress[:]); err1 == nil {
+		addr.Mainnet = globals.IsMainnet()
+		return addr.String()
+	}
+
+	// }
+	// }
+
+	return ""
+}
+
 func GetMinerAddressFromKeyHash(chain *blockchain.Blockchain, mbl block.MiniBlock) string {
 
 	if toporecord, err1 := chain.Store.Topo_store.Read(chain.Get_Height()); err1 == nil { // we must now fill in compressed ring members

@@ -807,8 +807,6 @@ func trigger_sync() {
 
 					connection.logger.V(1).Info("We need to resync with the peer", "our_height", height, "height", connection.Height, "pruned", connection.Pruned)
 
-					logger.Info(fmt.Sprintf("Peer telling us we're on wrong height: %s", connection.Addr.String()))
-
 					//connection.Unlock()
 					// set mode to syncronising
 
