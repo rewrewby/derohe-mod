@@ -299,6 +299,7 @@ func ListMiners() {
 
 	fmt.Printf("%-72s %-10s %-12s %-12s %-12s %-12s %-12s %-12s %-14s %-12s\n\n", "Wallet", "Connected", "Miners", "Hashrate", "Blocks", "Mini Blocks", "Rejected", "Orphan", "Success Rate", "Last Error")
 
+	total_hashrate := float64(0)
 	for wallet, stat := range miner_stats {
 
 		miners_connected_str := fmt.Sprintf("%d", stat.miners)
@@ -318,6 +319,7 @@ func ListMiners() {
 		}
 
 		hashrate := MinerHashrate(wallet)
+		total_hashrate += hashrate
 		hash_rate_string := ""
 
 		switch {
@@ -344,6 +346,22 @@ func ListMiners() {
 		fmt.Printf("%-72s %-10s %-12s %-12s %-12d %-12d %-12d %-12d %-14s %-12s\n", wallet, is_connected, miners_connected_str, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, p2p.GetMinerOrphanCount(wallet), success_rate_str, stat.lasterr)
 
 	}
+	hash_rate_string := "0 Hs"
+
+	switch {
+	case total_hashrate > 1000000000000:
+		hash_rate_string = fmt.Sprintf("%.3f TH/s", float64(total_hashrate)/1000000000000.0)
+	case total_hashrate > 1000000000:
+		hash_rate_string = fmt.Sprintf("%.3f GH/s", float64(total_hashrate)/1000000000.0)
+	case total_hashrate > 1000000:
+		hash_rate_string = fmt.Sprintf("%.3f MH/s", float64(total_hashrate)/1000000.0)
+	case total_hashrate > 1000:
+		hash_rate_string = fmt.Sprintf("%.3f KH/s", float64(total_hashrate)/1000.0)
+	case total_hashrate > 0:
+		hash_rate_string = fmt.Sprintf("%d H/s", int(total_hashrate))
+	}
+
+	fmt.Printf("\nTotal %d Miners Mining @ %s (Reported Hashrate)\n", len(miner_stats), hash_rate_string)
 
 	fmt.Print("\n")
 }
