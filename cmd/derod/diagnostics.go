@@ -33,7 +33,7 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 
 	// p2p_logger := globals.Logger.WithName("P2P")
 	p2p.SetLogger(&globals.Logger)
-	p2p.ControllerSetLogger()
+	p2p.ControllerSetLogger(&globals.Logger)
 	p2p.ConnectionSetLogger(&globals.Logger)
 
 	core_logger := globals.Logger.WithName("CORE")

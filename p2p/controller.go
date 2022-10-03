@@ -57,9 +57,9 @@ var Exit_Event = make(chan bool) // causes all threads to exit
 var Exit_In_Progress bool        // marks we are doing exit
 var logger logr.Logger           // global logger, every logger in this package is a child of this
 
-func ControllerSetLogger() {
+func ControllerSetLogger(newlogger *logr.Logger) {
 
-	logger = globals.Logger.WithName("P2P")
+	logger = *newlogger
 
 }
 
