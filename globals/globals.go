@@ -169,7 +169,7 @@ func (c *removeCallerCore) With(fields []zap.Field) zapcore.Core {
 	return &removeCallerCore{c.Core.With(fields)}
 }
 
-func SetLogLevel(console, logfile io.Writer, log_level int) {
+func SetLogLevel(console, logfile io.Writer, log_level int) logr.Logger {
 
 	Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(log_level))
 
@@ -190,11 +190,10 @@ func SetLogLevel(console, logfile io.Writer, log_level int) {
 
 	zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
 
-	Logger = zapr.NewLogger(zcore) // sets up global logger
+	newlogger := zapr.NewLogger(zcore) // sets up global logger
 	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
 
-	// remember -1 is debug, 0 is info
-
+	return newlogger
 }
 
 func InitializeLog(console, logfile io.Writer) {

@@ -298,6 +298,9 @@ func main() {
 		config.RunningConfig.GETWorkJobDispatchTime = time.Duration(i * int64(time.Millisecond))
 	}
 
+	// load trusted peers
+	p2p.LoadTrustedList()
+
 	go derodrpc.Getwork_server()
 
 	// setup function pointers
@@ -349,14 +352,45 @@ func main() {
 
 	globals.Cron.AddFunc("@every 10s", p2p.UpdateLiveBlockData)
 	// This tiny goroutine continuously updates status as required
+
 	go func() {
-		last_our_height := int64(0)
-		last_best_height := int64(0)
-		last_peer_count := uint64(0)
-		last_topo_height := int64(0)
-		last_mempool_tx_count := 0
-		last_regpool_tx_count := 0
-		last_second := int64(0)
+		for {
+			time.Sleep(1 * time.Minute)
+			RunDiagnosticCheckSquence(chain, l)
+		}
+	}()
+
+	last_our_height := int64(0)
+	last_best_height := int64(0)
+	last_peer_count := uint64(0)
+	last_topo_height := int64(0)
+	last_mempool_tx_count := 0
+	last_regpool_tx_count := 0
+	last_second := int64(0)
+	our_height := chain.Get_Height()
+	best_height, best_topo_height := p2p.Best_Peer_Height()
+	peer_count := p2p.Peer_Count()
+	topo_height := chain.Load_TOPO_HEIGHT()
+	peer_whitelist := p2p.Peer_Count_Whitelist()
+
+	mempool_tx_count := len(chain.Mempool.Mempool_List_TX())
+	regpool_tx_count := len(chain.Regpool.Regpool_List_TX())
+
+	network_hashrate := chain.Get_Network_HashRate()
+	hash_rate_string := hashratetostring(network_hashrate)
+
+	miniblock_count := chain.MiniBlocks.Count()
+	miner_count := derodrpc.CountMiners()
+
+	testnet_string := ""
+	if globals.IsMainnet() {
+		testnet_string = "\033[31m MAINNET"
+	} else {
+		testnet_string = "\033[31m TESTNET"
+	}
+
+	// 0.5 second sleeps
+	go func() {
 		for {
 			select {
 			case <-Exit_In_Progress:
@@ -366,82 +400,87 @@ func main() {
 
 			func() {
 				defer globals.Recover(0) // a panic might occur, due to some rare file system issues, so skip them
-				our_height := chain.Get_Height()
-				best_height, best_topo_height := p2p.Best_Peer_Height()
-				peer_count := p2p.Peer_Count()
-				topo_height := chain.Load_TOPO_HEIGHT()
-				peer_whitelist := p2p.Peer_Count_Whitelist()
+				our_height = chain.Get_Height()
+				best_height, best_topo_height = p2p.Best_Peer_Height()
+				peer_count = p2p.Peer_Count()
+				topo_height = chain.Load_TOPO_HEIGHT()
+				peer_whitelist = p2p.Peer_Count_Whitelist()
 
-				mempool_tx_count := len(chain.Mempool.Mempool_List_TX())
-				regpool_tx_count := len(chain.Regpool.Regpool_List_TX())
+				mempool_tx_count = len(chain.Mempool.Mempool_List_TX())
+				regpool_tx_count = len(chain.Regpool.Regpool_List_TX())
+				network_hashrate = chain.Get_Network_HashRate()
+				hash_rate_string = hashratetostring(network_hashrate)
 
-				if last_second != time.Now().Unix() || last_our_height != our_height || last_best_height != best_height || last_peer_count != peer_count || last_topo_height != topo_height || last_mempool_tx_count != mempool_tx_count || last_regpool_tx_count != regpool_tx_count {
-					// choose color based on urgency
-					color := "\033[32m" // default is green color
-					if our_height < best_height {
-						color = "\033[33m" // make prompt yellow
-						globals.NetworkTurtle = true
-					} else if our_height > best_height {
-						color = "\033[31m" // make prompt red
-						globals.NetworkTurtle = false
-					}
-
-					pcolor := "\033[32m" // default is green color
-					if peer_count < 1 {
-						pcolor = "\033[31m" // make prompt red
-						globals.NetworkTurtle = false
-					} else if peer_count <= 8 {
-						pcolor = "\033[33m" // make prompt yellow
-						globals.NetworkTurtle = true
-					}
-
-					hash_rate_string := hashratetostring(chain.Get_Network_HashRate())
-
-					testnet_string := ""
-					if globals.IsMainnet() {
-						testnet_string = "\033[31m MAINNET"
-					} else {
-						testnet_string = "\033[31m TESTNET"
-					}
-
-					turtle_string := ""
-					if globals.NetworkTurtle {
-						turtle_string = " (\033[31mTurtle\033[32m)"
-					}
-
-					if config.RunningConfig.OnlyTrusted {
-						turtle_string = " (\033[31mTrusted Mode\033[32m)"
-						if globals.NetworkTurtle {
-							turtle_string = turtle_string + " (!)"
-						}
-					}
-
-					testnet_string += fmt.Sprintf(" %d/", globals.MiniBlocksCollectionCount) + strconv.Itoa(chain.MiniBlocks.Count()) + " " + globals.GetOffset().Round(time.Millisecond).String() + "|" + globals.GetOffsetNTP().Round(time.Millisecond).String() + "|" + globals.GetOffsetP2P().Round(time.Millisecond).String()
-
-					good_blocks := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
-
-					miner_count := derodrpc.CountMiners()
-					unique_miner_count := derodrpc.CountUniqueMiners
-
-					l.SetPrompt(fmt.Sprintf("\033[1m\033[32mDERO HE (\033[31m%s-mod\033[32m):%s \033[0m"+color+"%d/%d [%d/%d] "+pcolor+"P %d/%d TXp %d:%d \033[32mNW %s >MN %d/%d [%d/%d] %s>>\033[0m ",
-						config.RunningConfig.OperatorName, turtle_string, our_height, topo_height, best_height, best_topo_height, peer_whitelist, peer_count, mempool_tx_count,
-						regpool_tx_count, hash_rate_string, unique_miner_count, miner_count, (good_blocks - derodrpc.CountMinisOrphaned), (good_blocks + derodrpc.CountMinisRejected), testnet_string))
-					l.Refresh()
-					last_second = time.Now().Unix()
-					last_our_height = our_height
-					last_best_height = best_height
-					last_peer_count = peer_count
-					last_mempool_tx_count = mempool_tx_count
-					last_regpool_tx_count = regpool_tx_count
-					last_topo_height = best_topo_height
-
-					go RunDiagnosticCheckSquence(chain, l)
-
-				}
+				miniblock_count = chain.MiniBlocks.Count()
+				miner_count = derodrpc.CountMiners()
 
 			}()
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
 
-			time.Sleep(1 * time.Second)
+	go func() {
+
+		for {
+			select {
+			case <-Exit_In_Progress:
+				return
+			default:
+			}
+
+			if last_second != time.Now().Unix() || last_our_height != our_height || last_best_height != best_height || last_peer_count != peer_count || last_topo_height != topo_height || last_mempool_tx_count != mempool_tx_count || last_regpool_tx_count != regpool_tx_count {
+				// choose color based on urgency
+				color := "\033[32m" // default is green color
+				if our_height < best_height {
+					color = "\033[33m" // make prompt yellow
+					globals.NetworkTurtle = true
+				} else if our_height > best_height {
+					color = "\033[31m" // make prompt red
+					globals.NetworkTurtle = false
+				}
+
+				pcolor := "\033[32m" // default is green color
+				if peer_count < 1 {
+					pcolor = "\033[31m" // make prompt red
+					globals.NetworkTurtle = false
+				} else if peer_count <= 8 {
+					pcolor = "\033[33m" // make prompt yellow
+					globals.NetworkTurtle = true
+				}
+
+				turtle_string := ""
+				if globals.NetworkTurtle {
+					turtle_string = " (\033[31mTurtle\033[32m)"
+				}
+
+				if config.RunningConfig.OnlyTrusted {
+					turtle_string = " (\033[31mTrusted Mode\033[32m)"
+					if globals.NetworkTurtle {
+						turtle_string = turtle_string + " (!)"
+					}
+				}
+
+				menu_string := testnet_string + fmt.Sprintf(" %d/", globals.MiniBlocksCollectionCount) + strconv.Itoa(miniblock_count) + " " + globals.GetOffset().Round(time.Millisecond).String() + "|" + globals.GetOffsetNTP().Round(time.Millisecond).String() + "|" + globals.GetOffsetP2P().Round(time.Millisecond).String()
+
+				good_blocks := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
+
+				unique_miner_count := derodrpc.CountUniqueMiners
+
+				l.SetPrompt(fmt.Sprintf("\033[1m\033[32mDERO HE (\033[31m%s-mod\033[32m):%s \033[0m"+color+"%d/%d [%d/%d] "+pcolor+"P %d/%d TXp %d:%d \033[32mNW %s >MN %d/%d [%d/%d] %s>>\033[0m ",
+					config.RunningConfig.OperatorName, turtle_string, our_height, topo_height, best_height, best_topo_height, peer_whitelist, peer_count, mempool_tx_count,
+					regpool_tx_count, hash_rate_string, unique_miner_count, miner_count, (good_blocks - derodrpc.CountMinisOrphaned), (good_blocks + derodrpc.CountMinisRejected), menu_string))
+				l.Refresh()
+				last_second = time.Now().Unix()
+				last_our_height = our_height
+				last_best_height = best_height
+				last_peer_count = peer_count
+				last_mempool_tx_count = mempool_tx_count
+				last_regpool_tx_count = regpool_tx_count
+				last_topo_height = best_topo_height
+
+			}
+
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 
@@ -522,7 +561,7 @@ restart_loop:
 
 		switch {
 		case line == "help":
-			usage(l.Stderr())
+			usage(l.Stdout())
 
 		case command == "profile": // writes cpu and memory profile
 			// TODO enable profile over http rpc to enable better testing/tracking

@@ -39,7 +39,7 @@ func IsTrustedIP(Addr string) bool {
 }
 
 // loads peers list from disk
-func load_trust_list() {
+func LoadTrustedList() {
 
 	peer_mutex.Lock()
 	defer peer_mutex.Unlock()
@@ -96,26 +96,29 @@ func Add_Trusted(Address string) {
 	defer trust_mutex.Unlock()
 
 	for _, c := range UniqueConnections() {
-		if ParseIPNoError(c.Addr.String()) == ParseIPNoError(Address) {
-			trusted_map[ParseIPNoError(c.Addr.String())] = int64(time.Now().UTC().Unix())
-			logger.Info(fmt.Sprintf("Address: %s (%s) - Added to Trusted List", c.Addr.String(), c.Tag))
-			break
+
+		ip := ParseIPNoError(c.Addr.String())
+
+		if ip == ParseIPNoError(Address) {
+			trusted_map[ip] = int64(time.Now().UTC().Unix())
+			logger.Info(fmt.Sprintf("Address: %s (%s) - Added to Trusted List", ip, c.Tag))
+			go ConnecToNode(ip)
 		} else if ParseIPNoError(Address) == Address {
 			trusted_map[Address] = int64(time.Now().UTC().Unix())
 			logger.Info(fmt.Sprintf("Address: %s - Added to Trusted List", Address))
-			break
+			go ConnecToNode(ip)
 		}
 
 		tag_match := regexp.MustCompile(Address)
 		if tag_match.Match([]byte(c.Tag)) {
-			trusted_map[ParseIPNoError(c.Addr.String())] = int64(time.Now().UTC().Unix())
-			logger.Info(fmt.Sprintf("Address: %s (%s) - Added to Trusted List", c.Addr.String(), c.Tag))
-			break
+			trusted_map[ip] = int64(time.Now().UTC().Unix())
+			logger.Info(fmt.Sprintf("Address: %s (%s) - Added to Trusted List", ip, c.Tag))
+			go ConnecToNode(ip)
 		}
 	}
 
 	go save_trust_list()
-	return
+
 }
 
 func Del_Trusted(Address string) {
@@ -138,7 +141,6 @@ func Del_Trusted(Address string) {
 	}
 
 	go save_trust_list()
-	return
 }
 
 func Print_Trusted_Peers() {

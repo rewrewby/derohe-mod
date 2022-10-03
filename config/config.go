@@ -172,8 +172,8 @@ var RunningConfig = RUN_CONFIG{
 	GETWorkJobDispatchTime: time.Duration(500 * time.Millisecond),
 	OnlyTrusted:            false,
 	ErrorLogExpirySeconds:  600,
-	Min_Peers:              31,
-	Max_Peers:              101,
+	Min_Peers:              200,
+	Max_Peers:              350,
 	NetworkStatsKeepCount:  100,
 	AntiCheat:              2,
 }

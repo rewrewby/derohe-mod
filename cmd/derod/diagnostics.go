@@ -27,14 +27,14 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 		logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
 	}
 
-	globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
+	globals.Logger = globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
 
 	logger = globals.Logger.WithName("derod")
 
-	p2p_logger := globals.Logger.WithName("P2P")
-	p2p.SetLogger(&p2p_logger)
-	p2p.ConnectionSetLogger(&p2p_logger)
+	// p2p_logger := globals.Logger.WithName("P2P")
+	p2p.SetLogger(&globals.Logger)
 	p2p.ControllerSetLogger()
+	p2p.ConnectionSetLogger(&globals.Logger)
 
 	core_logger := globals.Logger.WithName("CORE")
 	blockchain.SetLogger(&core_logger)
