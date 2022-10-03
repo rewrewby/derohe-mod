@@ -22,7 +22,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/deroproject/derohe/block"
 	"github.com/deroproject/derohe/blockchain"
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
@@ -107,16 +106,16 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 
 	result.SameHeightChainExtendedCount = blockchain.GetSameHeightChainExtendedCount(chain)
 
-	orphans, blocks, loss_rate, orphan_100 := block.BlockRateCount(result.OurHeight)
+	// orphans, blocks, loss_rate, orphan_100 := block.BlockRateCount(result.OurHeight)
 
-	result.NetworkBlockRateOrphan100 = float64(float64(float64(orphan_100)/900) * 100)
-	result.NetworkBlockRateOrphan = orphans
-	result.NetworkBlockRateMined = blocks
-	result.OrphanBlockRate = loss_rate
+	// result.NetworkBlockRateOrphan100 = float64(float64(float64(orphan_100)/900) * 100)
+	// result.NetworkBlockRateOrphan = orphans
+	// result.NetworkBlockRateMined = blocks
+	// result.OrphanBlockRate = loss_rate
 	result.RemotePopBlockCount = globals.BlockPopCount
 	result.CountMinisRejected = CountMinisRejected
 	result.CountMinisAccepted = CountMinisAccepted
-	result.CountMinisOrphaned = CountMinisOrphaned
+	result.CountMinisOrphaned = globals.CountOrphan
 	result.CountBlocks = CountBlocks
 
 	blocksMinted := (CountMinisAccepted + CountBlocks)

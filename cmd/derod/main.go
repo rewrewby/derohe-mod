@@ -160,12 +160,6 @@ func dump(filename string) {
 	}
 }
 
-// func ProcessOrphan(wallet string) {
-
-// 	go derodrpc.IncreaseMinerCount(wallet, "orphaned", "")
-
-// }
-
 var threadStartCount int
 var mutexStartCount int
 var blockingStartCount int
@@ -382,6 +376,8 @@ func main() {
 	miniblock_count := chain.MiniBlocks.Count()
 	miner_count := derodrpc.CountMiners()
 
+	total_orphans := p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
+
 	testnet_string := ""
 	if globals.IsMainnet() {
 		testnet_string = "\033[31m MAINNET"
@@ -413,6 +409,7 @@ func main() {
 
 				miniblock_count = chain.MiniBlocks.Count()
 				miner_count = derodrpc.CountMiners()
+				total_orphans = p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
 
 			}()
 			time.Sleep(500 * time.Millisecond)
@@ -460,10 +457,16 @@ func main() {
 					}
 				}
 
-				total_orphans := globals.CountOrphan + globals.CountMiniOrphan
 				network_loss := float64(0)
-				if total_orphans >= 1 {
-					network_loss = float64(float64(total_orphans)/float64(globals.CountTotalBlocks)) * 100
+				blockcount := config.RunningConfig.NetworkStatsKeepCount * 10
+				if globals.CountTotalBlocks < blockcount {
+					blockcount = globals.CountTotalBlocks
+				} else {
+					blockcount += int64(total_orphans)
+				}
+
+				if total_orphans > 0 && blockcount > 0 {
+					network_loss = float64(float64(total_orphans)/float64(blockcount)) * 100
 				}
 
 				menu_string := testnet_string + fmt.Sprintf(" %d/%d (%.1f%%) %s|%s|%s", globals.MiniBlocksCollectionCount, miniblock_count, network_loss, globals.GetOffset().Round(time.Millisecond).String(), globals.GetOffsetNTP().Round(time.Millisecond).String(), globals.GetOffsetP2P().Round(time.Millisecond).String())
@@ -473,7 +476,7 @@ func main() {
 
 				l.SetPrompt(fmt.Sprintf("\033[1m\033[32mDERO HE (\033[31m%s-mod\033[32m):%s \033[0m"+color+"%d/%d [%d/%d] "+pcolor+"P %d/%d TXp %d:%d \033[32mNW %s >MN %d/%d [%d/%d] %s>>\033[0m ",
 					config.RunningConfig.OperatorName, turtle_string, our_height, topo_height, best_height, best_topo_height, peer_whitelist, peer_count, mempool_tx_count,
-					regpool_tx_count, hash_rate_string, unique_miner_count, miner_count, (good_blocks - derodrpc.CountMinisOrphaned), (good_blocks + derodrpc.CountMinisRejected), menu_string))
+					regpool_tx_count, hash_rate_string, unique_miner_count, miner_count, (good_blocks - globals.CountMiniOrphan), (good_blocks + derodrpc.CountMinisRejected), menu_string))
 				l.Refresh()
 				last_second = time.Now().Unix()
 				last_our_height = our_height
@@ -1047,29 +1050,34 @@ restart_loop:
 			} else {
 				fmt.Printf("\nChain is in full mode.\n")
 			}
-			fmt.Printf(blue+"Integrator address "+red+"%s"+reset_color+"\n", chain.IntegratorAddress().String())
-			fmt.Printf(blue+"UTC time %s  (as per system clock) \n", time.Now().UTC())
-			fmt.Printf(blue+"UTC time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time().UTC(), time.Now().Sub(globals.Time()))
+			fmt.Printf(blue+"Integrator address "+red+"%s"+reset_color+"\n\n", chain.IntegratorAddress().String())
+			fmt.Printf("UTC time %s  (as per system clock) \n", time.Now().UTC())
+			fmt.Printf("UTC time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time().UTC(), time.Now().Sub(globals.Time()))
 			fmt.Printf("Local time %s  (as per system clock) \n", time.Now())
 			fmt.Printf("Local time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time(), time.Now().Sub(globals.Time()))
 			fmt.Printf("Block Pop Count: %d\n\n", globals.BlockPopCount)
 
-			orphan_count, mini_count, orphan_rate, orphan_100 := block.BlockRateCount(chain.Get_Height())
-			fmt.Printf(blue+"Network Orphan Mini Block Rate (10min): %d/%d (%.2f%%)"+reset_color+"\n", orphan_count, mini_count, orphan_rate)
+			total_orphans := p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
+			network_loss := float64(0)
+			blockcount := config.RunningConfig.NetworkStatsKeepCount * 10
+			if globals.CountTotalBlocks < blockcount {
+				blockcount = globals.CountTotalBlocks
+			} else {
+				blockcount += int64(total_orphans)
+			}
+			if total_orphans > 0 && blockcount > 0 {
+				network_loss = float64(float64(total_orphans)/float64(blockcount)) * 100
+			}
 
-			fmt.Print("Stats - Last 100 Blocks (900 Mini blocks)\n")
-
-			extended_count := blockchain.GetSameHeightChainExtendedCount(chain)
-			fmt.Printf("\tSame Height Extended Rate: %.2f%% (%d)\n", float64(extended_count), extended_count)
-			fmt.Printf("\tNetwork Orphan Mini Block Rate: %.2f%% (%d)\n", float64(float64(float64(orphan_100)/900)*100), orphan_100)
+			fmt.Printf(blue+"Network Orphan Mini Block Rate: "+red+"%d"+blue+"/"+green+"%d"+blue+" ("+red+"%.2f%%"+blue+")"+reset_color+"\n", total_orphans, blockcount, network_loss)
 
 			fmt.Print(blue + "\nPeer Stats:\n" + reset_color)
-			fmt.Printf("\tPeer ID: %d\n", p2p.GetPeerID())
-			fmt.Printf("\tNode Tag: %s\n", p2p.GetNodeTag())
+			fmt.Printf("\tPeer ID:"+yellow+" %d\n"+reset_color, p2p.GetPeerID())
+			fmt.Printf("\tNode Tag:"+yellow+" %s\n"+reset_color, p2p.GetNodeTag())
 
 			blocksMinted := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
 			fmt.Print(blue + "\nMining Stats:\n" + reset_color)
-			fmt.Printf("\tBlock Minted: %d (MB+IB)\n", blocksMinted)
+			fmt.Printf("\tBlock Minted: "+green+"%d "+reset_color+"(MB+IB)\n", blocksMinted)
 			if blocksMinted > 0 {
 
 				velocity_1h := float64(float64(blocksMinted)/time.Now().Sub(globals.StartTime).Seconds()) * 3600
@@ -1089,18 +1097,18 @@ restart_loop:
 			}
 
 			OrphanBlockRate := float64(0)
-			if derodrpc.CountMinisOrphaned > 0 {
-				OrphanBlockRate = float64(float64(float64(derodrpc.CountMinisOrphaned)/float64(blocksMinted)) * 100)
+			if globals.CountMiniOrphan > 0 {
+				OrphanBlockRate = float64(float64(float64(globals.CountMiniOrphan)/float64(blocksMinted)) * 100)
 			}
-			fmt.Printf(blue+"\tMy Orphan Block Rate: %.2f%%\n"+reset_color, OrphanBlockRate)
+			fmt.Printf("\tMy Orphan Block Rate:  "+red+"%.2f%% "+reset_color+"\n"+reset_color, OrphanBlockRate)
 
-			fmt.Printf("\tIB:%d MB:%d MBR:%d MBO:%d\n", derodrpc.CountBlocks, derodrpc.CountMinisAccepted, derodrpc.CountMinisRejected, derodrpc.CountMinisOrphaned)
+			fmt.Printf("\tIB:%d MB:%d MBR:%d MBO:%d\n", derodrpc.CountBlocks, derodrpc.CountMinisAccepted, derodrpc.CountMinisRejected, globals.CountMiniOrphan)
 			fmt.Printf("\tMB %.02f%%(1hr)\t%.05f%%(1d)\t%.06f%%(7d)\t(Moving average %%, will be 0 if no miniblock found)\n", derodrpc.HashrateEstimatePercent_1hr(), derodrpc.HashrateEstimatePercent_1day(), derodrpc.HashrateEstimatePercent_7day())
 			mh_1hr := uint64((float64(chain.Get_Network_HashRate()) * derodrpc.HashrateEstimatePercent_1hr()) / 100)
 			mh_1d := uint64((float64(chain.Get_Network_HashRate()) * derodrpc.HashrateEstimatePercent_1day()) / 100)
 			mh_7d := uint64((float64(chain.Get_Network_HashRate()) * derodrpc.HashrateEstimatePercent_7day()) / 100)
 			fmt.Printf("\tAvg Mining HR %s(1hr)\t%s(1d)\t%s(7d)\n", hashratetostring(mh_1hr), hashratetostring(mh_1d), hashratetostring(mh_7d))
-			fmt.Printf("\tReward Generated (since uptime): %s DERO\n", globals.FormatMoney(((blockchain.CalcBlockReward(uint64(chain.Get_Height())) / 10) * uint64(blocksMinted-derodrpc.CountMinisOrphaned))))
+			fmt.Printf("\tReward Generated (since uptime): "+green+"%s DERO\n"+reset_color, globals.FormatMoney(((blockchain.CalcBlockReward(uint64(chain.Get_Height())) / 10) * uint64(blocksMinted-globals.CountMiniOrphan))))
 
 			fmt.Printf("\n")
 			fmt.Printf(blue+"Current Block Reward: %s\n"+reset_color, globals.FormatMoney(blockchain.CalcBlockReward(uint64(chain.Get_Height()))))

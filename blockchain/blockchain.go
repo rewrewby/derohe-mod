@@ -1132,11 +1132,8 @@ func (chain *Blockchain) Add_Complete_Block(cbl *block.Complete_Block) (err erro
 		block_logger.Info(fmt.Sprintf("Chain Height %d", chain.Get_Height()))
 	}
 
-	hash, err := chain.Load_Block_Topological_order_at_index(int64(chain.Get_Stable_Height()))
-	oldBlock, err := chain.Load_BL_FROM_ID(hash)
-
 	if chain.Get_Height() > 0 {
-		purge_count := chain.MiniBlocks.PurgeHeight(oldBlock.MiniBlocks, chain.Get_Stable_Height()) // purge all miniblocks upto this height
+		purge_count := chain.MiniBlocks.PurgeHeight(chain.Get_Stable_Height()) // purge all miniblocks upto this height
 		logger.V(2).Info("Purged miniblock", "count", purge_count)
 
 	}
@@ -1458,7 +1455,7 @@ func (chain *Blockchain) Rewind_Chain(rewind_count int) (result bool) {
 		chain.Store.Topo_store.Clean(top_block_topo_index - i)
 	}
 
-	chain.MiniBlocks.PurgeHeight(nil, 0xffffffffffffff) // purge all miniblocks upto this height
+	chain.MiniBlocks.PurgeHeight(0xffffffffffffff) // purge all miniblocks upto this height
 
 	return true
 }

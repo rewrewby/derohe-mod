@@ -63,7 +63,8 @@ var boot_timer int64 = globals.StartTime.Unix()
 func RunDiagnosticCheckSquence(chain *blockchain.Blockchain, l *readline.Instance) {
 
 	// when - this is check all the time so
-
+	//disabled for now
+	return
 	if p2p.Peer_Count() <= 10 && time.Now().Unix()-globals.StartTime.Unix() < 180 {
 
 		if time.Now().Unix()-boot_timer > 10 {

@@ -210,13 +210,13 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 		} else { // rebroadcast miniblock
 
 			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
-			if globals.MiniBlocksCollectionCount > 9 {
-				atomic.AddInt64(&globals.CountMiniOrphan, 1)
-			}
+
 			atomic.AddInt64(&globals.CountTotalBlocks, 1)
+			wallet := GetMinerAddressFromKeyHash(chain, mbl)
+
+			go CheckIfMiniBlockIsOrphaned(false, mbl, wallet)
 
 			if config.RunningConfig.TraceBlocks {
-				wallet := GetMinerAddressFromKeyHash(chain, mbl)
 
 				text_color := green
 				if globals.MiniBlocksCollectionCount > 9 {

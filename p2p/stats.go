@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deroproject/derohe/block"
@@ -81,6 +82,173 @@ var Selfish_mutex sync.Mutex
 var SelfishNodeStats = make(map[string][]MyBlockReceivingError)
 
 var log_miniblock_mutex sync.Mutex
+
+var MyMiniBlocks = make(map[string][]block.MiniBlock)
+
+var miner_mini_mutex sync.Mutex
+var orphan_block_mutex sync.Mutex
+
+func AddBlockToMyCollection(mbl block.MiniBlock, miner string) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+
+	MyMiniBlocks[miner] = append(MyMiniBlocks[miner], mbl)
+}
+
+var OrphanHeightCount = make(map[uint64]int)
+var OrphanMiniBlocks = make(map[string][]block.MiniBlock)
+
+func AddBlockToOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+	OrphanMiniBlocks[miner] = append(OrphanMiniBlocks[miner], mbl)
+
+	i := OrphanHeightCount[mbl.Height]
+	i++
+	OrphanHeightCount[mbl.Height] = i
+}
+
+func CountNetworkOrphanSince(height uint64) (total int) {
+
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+
+	for count_height, count := range OrphanHeightCount {
+		if count_height >= height {
+			total += count
+		}
+	}
+
+	return total
+}
+
+var MyOrphanMiniBlocks = make(map[string][]block.MiniBlock)
+
+func AddBlockToMyOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+	MyOrphanMiniBlocks[miner] = append(MyOrphanMiniBlocks[miner], mbl)
+}
+
+func GetMinerOrphanCount(miner string) int {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+
+	count := 0
+	_, found := MyOrphanMiniBlocks[miner]
+	if found {
+		count = len(MyOrphanMiniBlocks[miner])
+	}
+
+	return count
+}
+
+func IsMiniBlockOrphan(mbl block.MiniBlock) bool {
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+
+	for miner, _ := range OrphanMiniBlocks {
+		for _, orphan := range OrphanMiniBlocks[miner] {
+			if orphan == mbl {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// 	AddBlockToMyCollection(mblData, miner)
+
+func CheckIfMiniBlockIsOrphaned(local bool, mblData block.MiniBlock, miner string) {
+
+	var fails int
+
+	for {
+		time.Sleep(time.Second)
+		if chain.Get_Height() >= int64(mblData.Height)+1 {
+			// logger.V(2).Info(fmt.Sprintf("Height: %d - Checking if orphaned (%s)", mblData.Height, mblData.GetHash().String()))
+			block, err := chain.Load_Block_Topological_order_at_index(int64(mblData.Height))
+			if err != nil {
+				fails++
+				if fails == 5 {
+					return
+				}
+				continue
+			}
+			bl, err := chain.Load_BL_FROM_ID(block)
+			if err != nil {
+				fails++
+				if fails == 5 {
+					return
+				}
+				continue
+			}
+			for _, mbl := range bl.MiniBlocks {
+				if mbl == mblData {
+					return
+				}
+			}
+
+			// Mini Block is Orphan
+
+			logger.V(2).Info(fmt.Sprintf("Height: %d - %s Miniblock (%s) ORPHANED", mblData.Height, miner, mblData.GetHash().String()))
+
+			if config.RunningConfig.TraceBlocks {
+				if local {
+					logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block\t"+red+"("+yellow+"Profit Loss"+red+")"+reset_color+reset_color, mblData.Height, miner))
+				} else {
+					logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block"+reset_color, mblData.Height, miner))
+				}
+			}
+
+			if local {
+				atomic.AddInt64(&globals.CountMiniOrphan, 1)
+				go AddBlockToMyOrphanMiniBlockCollection(mblData, miner)
+			}
+			go AddBlockToOrphanMiniBlockCollection(mblData, miner)
+
+			return
+		}
+	}
+}
+
+func UpdateLiveBlockData() {
+
+	log_miniblock_mutex.Lock()
+	defer log_miniblock_mutex.Unlock()
+
+	for key, mbl := range MiniblockLogs {
+
+		if mbl.Miniblock.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
+			delete(MiniblockLogs, key)
+			continue
+		}
+
+		if IsMiniBlockOrphan(mbl.Miniblock) {
+			mbl.IsOrphan = true
+		} else {
+			mbl.IsOrphan = false
+		}
+		MiniblockLogs[key] = mbl
+	}
+
+	for key, bl := range FinalBlockLogs {
+
+		if bl.Block.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
+			delete(FinalBlockLogs, key)
+			continue
+		}
+
+		// if IsOrphan(bl.Block) {
+		// 	bl.IsOrphan = true
+		// } else {
+		bl.IsOrphan = false
+		// }
+		FinalBlockLogs[key] = bl
+
+	}
+
+}
 
 func GetBlockLogLenght() (int, int) {
 
@@ -293,44 +461,6 @@ func PotentialMinersOnNodeFromHeight(height int64, Address string) ([]string, ma
 	}
 
 	return ordered_miners, data
-}
-
-func UpdateLiveBlockData() {
-
-	log_miniblock_mutex.Lock()
-	defer log_miniblock_mutex.Unlock()
-
-	for key, mbl := range MiniblockLogs {
-
-		if mbl.Miniblock.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
-			delete(MiniblockLogs, key)
-			continue
-		}
-
-		if block.IsBlockOrphan(mbl.Miniblock.GetHash().String()) {
-			mbl.IsOrphan = true
-		} else {
-			mbl.IsOrphan = false
-		}
-		MiniblockLogs[key] = mbl
-	}
-
-	for key, bl := range FinalBlockLogs {
-
-		if bl.Block.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
-			delete(FinalBlockLogs, key)
-			continue
-		}
-
-		if block.IsBlockOrphan(bl.Block.GetHash().String()) {
-			bl.IsOrphan = true
-		} else {
-			bl.IsOrphan = false
-		}
-		FinalBlockLogs[key] = bl
-
-	}
-
 }
 
 func PotentialMinerNodeHeight(height int64, Wallet string) ([]string, map[string]map[string]float64) {

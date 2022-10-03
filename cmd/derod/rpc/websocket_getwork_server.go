@@ -25,6 +25,7 @@ import (
 	"github.com/deroproject/derohe/block"
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
+	"github.com/deroproject/derohe/p2p"
 	"github.com/deroproject/derohe/rpc"
 	"github.com/deroproject/graviton"
 	"github.com/go-logr/logr"
@@ -153,8 +154,7 @@ var CountUniqueMiners int64
 
 var CountMinisAccepted int64 // total accepted which passed Powtest, chain may still ignore them
 var CountMinisRejected int64 // total rejected // note we are only counting rejected as those which didnot pass Pow test
-var CountMinisOrphaned int64
-var CountBlocks int64 //  total blocks found as integrator, note that block can still be a orphan
+var CountBlocks int64        //  total blocks found as integrator, note that block can still be a orphan
 
 // total = CountAccepted + CountRejected + CountBlocks(they may be orphan or may not get rewarded)
 
@@ -340,7 +340,7 @@ func ListMiners() {
 			is_connected = "yes"
 		}
 
-		fmt.Printf("%-72s %-10s %-12s %-12s %-12d %-12d %-12d %-12d %-14s %-12s\n", wallet, is_connected, miners_connected_str, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, block.GetMinerOrphanCount(wallet), success_rate_str, stat.lasterr)
+		fmt.Printf("%-72s %-10s %-12s %-12s %-12d %-12d %-12d %-12d %-14s %-12s\n", wallet, is_connected, miners_connected_str, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, p2p.GetMinerOrphanCount(wallet), success_rate_str, stat.lasterr)
 
 	}
 
@@ -499,7 +499,7 @@ func newUpgrader() *websocket.Upgrader {
 			if err = mbl.Deserialize(mbl_block_data_bytes); err != nil {
 				logger.V(1).Error(err, "Error Deserializing newly minted block")
 			} else {
-				go block.AddBlockToMyCollection(mbl, c.RemoteAddr().String())
+				go p2p.AddBlockToMyCollection(mbl, c.RemoteAddr().String())
 			}
 
 			//logger.Infof("Submitted block %s accepted", blid)
@@ -508,11 +508,9 @@ func newUpgrader() *websocket.Upgrader {
 				atomic.AddInt64(&CountMinisAccepted, 1)
 				go IncreaseMinerCount(miner, sess.address.String(), "miniblocks", "")
 
+				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, miner)
 				globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
-				if globals.MiniBlocksCollectionCount > 9 {
-					atomic.AddInt64(&globals.CountMiniOrphan, 1)
-				}
 
 				rate_lock.Lock()
 				defer rate_lock.Unlock()
