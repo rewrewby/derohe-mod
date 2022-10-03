@@ -227,19 +227,30 @@ func Peer_Add(p *Peer) {
 
 }
 
-func SetLogger(newlogger *logr.Logger) {
+func SetLogger(newlogger *logr.Logger, Address string) {
 
 	peer_mutex.Lock()
 	defer peer_mutex.Unlock()
 
 	logger = *newlogger
 
+	Address = ParseIPNoError(Address)
+
 	connection_map.Range(func(k, value interface{}) bool {
 		c := value.(*Connection)
 
+		ip := ParseIPNoError(c.Addr.String())
+		if len(Address) >= 7 && ip != Address {
+			return true
+		}
+
 		logger = *newlogger
-		c.logger = logger.WithName("peer").WithName(c.Addr.String())
+		c.logger = logger.WithName(c.Addr.String())
 		connection_map.Store(k, c)
+
+		if len(Address) >= 7 && ip == Address {
+			c.logger.Info("PEER Tracing Started")
+		}
 		return true
 	})
 

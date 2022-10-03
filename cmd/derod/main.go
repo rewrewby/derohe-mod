@@ -1122,6 +1122,24 @@ restart_loop:
 
 		case command == "debug":
 
+			log_level := int8(5)
+			if len(line_parts) >= 2 {
+
+				if len(line_parts) == 2 {
+					i, err := strconv.ParseInt(line_parts[2], 10, 64)
+					if err != nil {
+						io.WriteString(l.Stderr(), "usage: debug <ip> [log level]\n")
+					} else {
+						log_level = int8(i)
+					}
+				}
+				DebugPeer(l, line_parts[1], log_level)
+			} else {
+				io.WriteString(l.Stderr(), "usage: debug <ip> [log level]\n")
+			}
+
+		case command == "debug":
+
 			log_level := config.RunningConfig.LogLevel
 			if len(line_parts) == 2 {
 
@@ -2093,6 +2111,7 @@ var completer = readline.NewPrefixCompleter(
 	readline.PcItem("clear_peer_stats"),
 	readline.PcItem("peer_info"),
 	readline.PcItem("debug"),
+	readline.PcItem("debug_peer"),
 	readline.PcItem("run_diagnostics"),
 	readline.PcItem("permban"),
 	readline.PcItem("config"),

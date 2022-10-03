@@ -17,6 +17,14 @@ import (
 
 var DiagnosticInterval uint64 = 1
 
+func DebugPeer(l *readline.Instance, Address string, log_level int8) {
+
+	peer_log := globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
+
+	p2p.SetLogger(&peer_log, Address)
+
+}
+
 func ToggleDebug(l *readline.Instance, log_level int8) {
 
 	if config.RunningConfig.LogLevel == log_level {
@@ -32,7 +40,7 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 	logger = globals.Logger.WithName("derod")
 
 	// p2p_logger := globals.Logger.WithName("P2P")
-	p2p.SetLogger(&globals.Logger)
+	p2p.SetLogger(&globals.Logger, "")
 	p2p.ControllerSetLogger(&globals.Logger)
 	p2p.ConnectionSetLogger(&globals.Logger)
 
