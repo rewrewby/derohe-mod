@@ -150,6 +150,7 @@ func CountMiners() int {
 }
 
 var CountUniqueMiners int64
+
 var CountMinisAccepted int64 // total accepted which passed Powtest, chain may still ignore them
 var CountMinisRejected int64 // total rejected // note we are only counting rejected as those which didnot pass Pow test
 var CountMinisOrphaned int64
@@ -507,6 +508,12 @@ func newUpgrader() *websocket.Upgrader {
 				atomic.AddInt64(&CountMinisAccepted, 1)
 				go IncreaseMinerCount(miner, sess.address.String(), "miniblocks", "")
 
+				globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+				atomic.AddInt64(&globals.CountTotalBlocks, 1)
+				if globals.MiniBlocksCollectionCount > 9 {
+					atomic.AddInt64(&globals.CountMiniOrphan, 1)
+				}
+
 				rate_lock.Lock()
 				defer rate_lock.Unlock()
 				mini_found_time = append(mini_found_time, time.Now().Unix())
@@ -533,6 +540,8 @@ func newUpgrader() *websocket.Upgrader {
 				sess.blocks++
 				nodeFee = true
 				atomic.AddInt64(&CountBlocks, 1)
+				atomic.AddInt64(&globals.CountTotalBlocks, 1)
+
 				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
 			}
 			setUserStats(sess.address.String(), nodeFee)

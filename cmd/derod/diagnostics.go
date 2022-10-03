@@ -85,7 +85,12 @@ func RunDiagnosticCheckSquence(chain *blockchain.Blockchain, l *readline.Instanc
 
 	w := l.Stdout()
 
-	var old_debug_level = config.RunningConfig.LogLevel
+	old_show_blocks := config.RunningConfig.TraceBlocks
+	config.RunningConfig.TraceBlocks = false
+	old_tracedlist := p2p.PeerTraceList
+	p2p.ClearTraceList()
+	old_debug_level := config.RunningConfig.LogLevel
+
 	ToggleDebug(l, 0)
 
 	if old_debug_level > 0 {
@@ -376,4 +381,11 @@ func RunDiagnosticCheckSquence(chain *blockchain.Blockchain, l *readline.Instanc
 	io.WriteString(w, "\n")
 	globals.DiagnocticCheckRunning = false
 	ToggleDebug(l, old_debug_level)
+
+	// restore traces
+	config.RunningConfig.TraceBlocks = old_show_blocks
+	for _, ip := range old_tracedlist {
+		p2p.AddPeerTraceList(ip)
+	}
+
 }

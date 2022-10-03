@@ -210,6 +210,10 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 		} else { // rebroadcast miniblock
 
 			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+			if globals.MiniBlocksCollectionCount > 9 {
+				atomic.AddInt64(&globals.CountMiniOrphan, 1)
+			}
+			atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
 			if config.RunningConfig.TraceBlocks {
 				wallet := GetMinerAddressFromKeyHash(chain, mbl)
@@ -294,7 +298,9 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 			if last_height == bl.Height {
 				// Display orphans as yellow
 				text_color = yellow
+				atomic.AddInt64(&globals.CountOrphan, 1)
 			}
+			atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
 			last_height = bl.Height
 			logger.Info(fmt.Sprintf(text_color+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+text_color+"Successfully found DERO integrator block", last_height, wallet))

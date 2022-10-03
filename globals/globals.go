@@ -79,6 +79,10 @@ var goProfile = pprof.Lookup("goroutine")
 
 var MiniBlocksCollectionCount uint8
 
+var CountMiniOrphan int64
+var CountOrphan int64
+var CountTotalBlocks int64
+
 func CountThreads() int {
 	return threadProfile.Count()
 }

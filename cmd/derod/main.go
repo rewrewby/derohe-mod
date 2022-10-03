@@ -460,10 +460,15 @@ func main() {
 					}
 				}
 
-				menu_string := testnet_string + fmt.Sprintf(" %d/", globals.MiniBlocksCollectionCount) + strconv.Itoa(miniblock_count) + " " + globals.GetOffset().Round(time.Millisecond).String() + "|" + globals.GetOffsetNTP().Round(time.Millisecond).String() + "|" + globals.GetOffsetP2P().Round(time.Millisecond).String()
+				total_orphans := globals.CountOrphan + globals.CountMiniOrphan
+				network_loss := float64(0)
+				if total_orphans >= 1 {
+					network_loss = float64(float64(total_orphans)/float64(globals.CountTotalBlocks)) * 100
+				}
+
+				menu_string := testnet_string + fmt.Sprintf(" %d/%d (%.1f%%) %s|%s|%s", globals.MiniBlocksCollectionCount, miniblock_count, network_loss, globals.GetOffset().Round(time.Millisecond).String(), globals.GetOffsetNTP().Round(time.Millisecond).String(), globals.GetOffsetP2P().Round(time.Millisecond).String())
 
 				good_blocks := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
-
 				unique_miner_count := derodrpc.CountUniqueMiners
 
 				l.SetPrompt(fmt.Sprintf("\033[1m\033[32mDERO HE (\033[31m%s-mod\033[32m):%s \033[0m"+color+"%d/%d [%d/%d] "+pcolor+"P %d/%d TXp %d:%d \033[32mNW %s >MN %d/%d [%d/%d] %s>>\033[0m ",
