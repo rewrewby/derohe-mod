@@ -1006,39 +1006,51 @@ restart_loop:
 
 			supply = (config.PREMINE + blockchain.CalcBlockReward(uint64(chain.Get_Height()))*uint64(chain.Get_Height())) // valid for few years
 
+			green := "\033[32m"      // default is green color
+			yellow := "\033[33m"     // make prompt yellow
+			red := "\033[31m"        // make prompt red
+			blue := "\033[34m"       // blue color
+			reset_color := "\033[0m" // reset color
+
 			hostname, _ := os.Hostname()
-			fmt.Printf("STATUS MENU for DERO HE Node - Hostname: %s\n\n", hostname)
-			fmt.Printf("Hostname: %s - Uptime: %s\n", hostname, time.Now().Sub(globals.StartTime).Round(time.Second).String())
-			fmt.Printf("Uptime Since: %s - Block: %d\n\n", globals.StartTime.Format(time.RFC1123), globals.BlockChainStartHeight)
+			fmt.Printf(blue+"STATUS MENU for DERO HE Node (%s%s%s)\n\n", red, hostname, blue)
 
-			fmt.Printf("DERO 🥷 Daemon - Threads [%d/%d] - Mutex [%d/%d] - Blocked [%d/%d] - GO Procs [%d/%d]\n",
-				threadStartCount, globals.CountThreads(), mutexStartCount, globals.CountMutex(),
-				blockingStartCount, globals.CountBlocked(), goStartCount, globals.CountGoProcs())
-			fmt.Printf("Version: %s\n\n", config.Version.String())
+			threads := fmt.Sprintf("%sThreads %s[%s%d%s/%s%d%s]%s", yellow, blue, green, threadStartCount, blue, green, globals.CountThreads(), blue, reset_color)
 
-			fmt.Printf("Network %s Height %d  NW Hashrate %0.03f MH/sec  Peers %d inc, %d out  MEMPOOL size %d REGPOOL %d  Total Supply %s DERO \n", globals.Config.Name, chain.Get_Height(), float64(chain.Get_Network_HashRate())/1000000.0, inc, out, mempool_tx_count, regpool_tx_count, globals.FormatMoney(supply))
+			mutex := fmt.Sprintf("%sMutex %s[%s%d%s/%s%d%s]%s", yellow, blue, green, mutexStartCount, blue, green, globals.CountMutex(), blue, reset_color)
+
+			blocked := fmt.Sprintf("%sBlocked %s[%s%d%s/%s%d%s]%s", yellow, blue, green, blockingStartCount, blue, green, globals.CountBlocked(), blue, reset_color)
+			goprocs := fmt.Sprintf("%sGO Procs %s[%s%d%s/%s%d%s]%s", yellow, blue, green, goStartCount, blue, green, globals.CountGoProcs(), blue, reset_color)
+
+			fmt.Printf(blue+"DERO 🥷 Daemon - %s - %s - %s - %s\n", threads, mutex, blocked, goprocs)
+
+			fmt.Printf(blue+"Version: %s%s\n\n", yellow, config.Version.String())
+
+			fmt.Printf(blue+"Hostname: %s%s %sUptime: %s%s\n", red, hostname, blue, red, time.Now().Sub(globals.StartTime).Round(time.Second).String())
+			fmt.Printf(blue+"Uptime Since: %s%s %sBlock: %s%d\n\n", red, globals.StartTime.Format(time.RFC1123), blue, red, globals.BlockChainStartHeight)
+
+			fmt.Printf(blue+"Network "+yellow+"%s"+blue+" Height "+red+"%d"+blue+"  NW Hashrate "+red+"%0.03f MH/sec"+blue+"  Peers "+yellow+"%d"+blue+" inc, "+yellow+"%d"+blue+" out  MEMPOOL size "+yellow+"%d"+blue+" REGPOOL "+yellow+"%d"+blue+"  Total Supply "+yellow+"%s"+blue+" DERO \n", globals.Config.Name, chain.Get_Height(), float64(chain.Get_Network_HashRate())/1000000.0, inc, out, mempool_tx_count, regpool_tx_count, globals.FormatMoney(supply))
 
 			tips := chain.Get_TIPS()
-			fmt.Printf("Tips ")
+			fmt.Printf(blue + "Tips " + reset_color)
 			for _, tip := range tips {
 				fmt.Printf(" %s(%d)\n", tip, chain.Load_Height_for_BL_ID(tip))
 			}
 
 			if chain.LocatePruneTopo() >= 1 {
-				fmt.Printf("\nChain is pruned till %d\n", chain.LocatePruneTopo())
+				fmt.Printf(blue+"\nChain is pruned till "+yellow+"%d"+reset_color+"\n", chain.LocatePruneTopo())
 			} else {
 				fmt.Printf("\nChain is in full mode.\n")
 			}
-			fmt.Printf("Integrator address %s\n", chain.IntegratorAddress().String())
-			fmt.Printf("UTC time %s  (as per system clock) \n", time.Now().UTC())
-			fmt.Printf("UTC time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time().UTC(), time.Now().Sub(globals.Time()))
+			fmt.Printf(blue+"Integrator address "+red+"%s"+reset_color+"\n", chain.IntegratorAddress().String())
+			fmt.Printf(blue+"UTC time %s  (as per system clock) \n", time.Now().UTC())
+			fmt.Printf(blue+"UTC time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time().UTC(), time.Now().Sub(globals.Time()))
 			fmt.Printf("Local time %s  (as per system clock) \n", time.Now())
 			fmt.Printf("Local time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time(), time.Now().Sub(globals.Time()))
-
-			fmt.Printf("\nBlock Pop Count: %d\n", globals.BlockPopCount)
+			fmt.Printf("Block Pop Count: %d\n\n", globals.BlockPopCount)
 
 			orphan_count, mini_count, orphan_rate, orphan_100 := block.BlockRateCount(chain.Get_Height())
-			fmt.Printf("Network Orphan Mini Block Rate (10min): %d/%d (%.2f%%)\n", orphan_count, mini_count, orphan_rate)
+			fmt.Printf(blue+"Network Orphan Mini Block Rate (10min): %d/%d (%.2f%%)"+reset_color+"\n", orphan_count, mini_count, orphan_rate)
 
 			fmt.Print("Stats - Last 100 Blocks (900 Mini blocks)\n")
 
@@ -1046,12 +1058,12 @@ restart_loop:
 			fmt.Printf("\tSame Height Extended Rate: %.2f%% (%d)\n", float64(extended_count), extended_count)
 			fmt.Printf("\tNetwork Orphan Mini Block Rate: %.2f%% (%d)\n", float64(float64(float64(orphan_100)/900)*100), orphan_100)
 
-			fmt.Print("\nPeer Stats:\n")
+			fmt.Print(blue + "\nPeer Stats:\n" + reset_color)
 			fmt.Printf("\tPeer ID: %d\n", p2p.GetPeerID())
 			fmt.Printf("\tNode Tag: %s\n", p2p.GetNodeTag())
 
 			blocksMinted := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
-			fmt.Print("\nMining Stats:\n")
+			fmt.Print(blue + "\nMining Stats:\n" + reset_color)
 			fmt.Printf("\tBlock Minted: %d (MB+IB)\n", blocksMinted)
 			if blocksMinted > 0 {
 
@@ -1075,7 +1087,7 @@ restart_loop:
 			if derodrpc.CountMinisOrphaned > 0 {
 				OrphanBlockRate = float64(float64(float64(derodrpc.CountMinisOrphaned)/float64(blocksMinted)) * 100)
 			}
-			fmt.Printf("\tMy Orphan Block Rate: %.2f%%\n", OrphanBlockRate)
+			fmt.Printf(blue+"\tMy Orphan Block Rate: %.2f%%\n"+reset_color, OrphanBlockRate)
 
 			fmt.Printf("\tIB:%d MB:%d MBR:%d MBO:%d\n", derodrpc.CountBlocks, derodrpc.CountMinisAccepted, derodrpc.CountMinisRejected, derodrpc.CountMinisOrphaned)
 			fmt.Printf("\tMB %.02f%%(1hr)\t%.05f%%(1d)\t%.06f%%(7d)\t(Moving average %%, will be 0 if no miniblock found)\n", derodrpc.HashrateEstimatePercent_1hr(), derodrpc.HashrateEstimatePercent_1day(), derodrpc.HashrateEstimatePercent_7day())
@@ -1086,7 +1098,7 @@ restart_loop:
 			fmt.Printf("\tReward Generated (since uptime): %s DERO\n", globals.FormatMoney(((blockchain.CalcBlockReward(uint64(chain.Get_Height())) / 10) * uint64(blocksMinted-derodrpc.CountMinisOrphaned))))
 
 			fmt.Printf("\n")
-			fmt.Printf("Current Block Reward: %s\n", globals.FormatMoney(blockchain.CalcBlockReward(uint64(chain.Get_Height()))))
+			fmt.Printf(blue+"Current Block Reward: %s\n"+reset_color, globals.FormatMoney(blockchain.CalcBlockReward(uint64(chain.Get_Height()))))
 			fmt.Printf("\n")
 
 			// print hardfork status on second line
