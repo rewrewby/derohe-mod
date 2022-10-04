@@ -106,12 +106,24 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 
 	result.SameHeightChainExtendedCount = blockchain.GetSameHeightChainExtendedCount(chain)
 
-	// orphans, blocks, loss_rate, orphan_100 := block.BlockRateCount(result.OurHeight)
+	total_orphans := p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
 
-	// result.NetworkBlockRateOrphan100 = float64(float64(float64(orphan_100)/900) * 100)
-	// result.NetworkBlockRateOrphan = orphans
-	// result.NetworkBlockRateMined = blocks
-	// result.OrphanBlockRate = loss_rate
+	network_loss := float64(0)
+	blockcount := config.RunningConfig.NetworkStatsKeepCount * 10
+	if globals.CountTotalBlocks < blockcount {
+		blockcount = globals.CountTotalBlocks
+	} else {
+		blockcount += int64(total_orphans)
+	}
+
+	if total_orphans > 0 && blockcount > 0 {
+		network_loss = float64(float64(total_orphans)/float64(blockcount)) * 100
+	}
+
+	result.NetworkBlockRateOrphan100 = network_loss
+	result.NetworkBlockRateOrphan = total_orphans
+	result.NetworkBlockRateMined = int(blockcount)
+
 	result.RemotePopBlockCount = globals.BlockPopCount
 	result.CountMinisRejected = CountMinisRejected
 	result.CountMinisAccepted = CountMinisAccepted
@@ -119,7 +131,11 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	result.CountBlocks = CountBlocks
 
 	blocksMinted := (CountMinisAccepted + CountBlocks)
-
+	OrphanBlockRate := float64(0)
+	if globals.CountMiniOrphan > 0 {
+		OrphanBlockRate = float64(float64(float64(globals.CountMiniOrphan)/float64(blocksMinted)) * 100)
+	}
+	result.OrphanBlockRate = OrphanBlockRate
 	result.MintingSuccessRate = float64(100)
 	if result.CountMinisOrphaned >= 1 {
 		result.MintingSuccessRate = float64(100 - float64(float64(result.CountMinisOrphaned/blocksMinted)*100))
