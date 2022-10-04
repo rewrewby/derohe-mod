@@ -923,8 +923,8 @@ func isFeeOverdue(miner string) bool {
 	ration := (float64(s.blocks) / float64(s.blocks+s.miniblocks) * 100)
 	if ration < 5 {
 		logger_getwork.V(0).Info("Fees overdue", "miner", miner)
-		// s.isIgnored = true
-		// userStats[miner] = s
+		s.isIgnored = true
+		userStats[miner] = s
 
 		return true
 	}
