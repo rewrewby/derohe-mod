@@ -1645,6 +1645,16 @@ restart_loop:
 						config.RunningConfig.P2PTurbo = true
 					}
 				}
+
+				if line_parts[1] == "maintenance" {
+					if len(line_parts) == 3 {
+						config.RunningConfig.MinerMaintenanceMessage = line_parts[2]
+					} else {
+						globals.NodeMaintenance = true
+						globals.MaintenanceStart = time.Now().Unix()
+					}
+				}
+
 				if line_parts[1] == "whitelist_incoming" {
 
 					if config.RunningConfig.WhitelistIncoming {
@@ -1695,6 +1705,8 @@ restart_loop:
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "P2P Min Peers", p2p.Min_Peers, "config min_peers <num>"))
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "P2P Max Peers", p2p.Max_Peers, "config max_peers <num>"))
+
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Miner Maintenance Message", config.RunningConfig.MinerMaintenanceMessage, "config maitenance [new message] - will send message for 5 min or until restart"))
 
 			blid, _ := chain.Load_Block_Topological_order_at_index(chain.Get_Height())
 			blid50, _ := chain.Load_Block_Topological_order_at_index(chain.Get_Height() - 50)

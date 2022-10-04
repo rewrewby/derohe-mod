@@ -194,12 +194,12 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 
 	if counter == "blocks" {
 		i.blocks++
-		logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit"+red+")"+reset_color, chain.Get_Height(), wallet))
+		logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height(), wallet))
 	}
 
 	if counter == "miniblocks" {
 		i.miniblocks++
-		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit"+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
+		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
 	}
 
 	if counter == "rejected" {
@@ -404,29 +404,37 @@ func SendJob() {
 			params.Difficulty = diff.String()
 			params.Hansen33Mod = true
 
-			mbl := mbl_main
+			// Don't start mining before we are ready
+			if globals.CountTotalBlocks >= 1 {
 
-			if !mbl.Final { //write miners address only if possible
-				// if !isFeeOverdue(v.address.String()) {
-				copy(mbl.KeyHash[:], v.address_sum[:])
-				// } else {
-				// 	switch config.RunningConfig.AntiCheat {
-				// 	// allow cheating
-				// 	case 0:
-				// 		copy(mbl.KeyHash[:], v.address_sum[:])
-				// 		// ban cheater
-				// 	case 1:
-				// 		banCheater(ParseIPNoError(k.RemoteAddr().String()), v.address.String())
-				// 		// anti-cheat solution
-				// 	case 2:
-				// 		return
-				// 	default:
-				// 	}
-				// }
-			}
+				mbl := mbl_main
 
-			for i := range mbl.Nonce { // give each user different work
-				mbl.Nonce[i] = globals.Global_Random.Uint32() // fill with randomness
+				if !mbl.Final { //write miners address only if possible
+					if !isFeeOverdue(v.address.String()) {
+						copy(mbl.KeyHash[:], v.address_sum[:])
+					} else {
+						switch config.RunningConfig.AntiCheat {
+						// allow cheating
+						case 0:
+							copy(mbl.KeyHash[:], v.address_sum[:])
+							// ban cheater
+						case 1:
+							banCheater(ParseIPNoError(k.RemoteAddr().String()), v.address.String())
+							// anti-cheat solution
+						case 2:
+							return
+						default:
+						}
+					}
+				}
+
+				for i := range mbl.Nonce { // give each user different work
+					mbl.Nonce[i] = globals.Global_Random.Uint32() // fill with randomness
+				}
+				params.Blockhashing_blob = fmt.Sprintf("%x", mbl.Serialize())
+
+			} else {
+				params.LastError = "Node is currently booting..."
 			}
 
 			if !v.valid_address && !chain.IsAddressHashValid(false, v.address_sum) {
@@ -434,7 +442,6 @@ func SendJob() {
 			} else {
 				v.valid_address = true
 			}
-			params.Blockhashing_blob = fmt.Sprintf("%x", mbl.Serialize())
 			params.Blocks = v.blocks
 			params.MiniBlocks = v.miniblocks
 			if v.hashrate < 1 { // if not a hansen mod miner, then deduct orphan from mined blocks
@@ -442,6 +449,10 @@ func SendJob() {
 			}
 			params.Rejected = v.rejected
 			params.Orphans = v.orphans
+
+			if globals.NodeMaintenance && globals.MaintenanceStart+300 >= time.Now().Unix() {
+				params.LastError = config.RunningConfig.MinerMaintenanceMessage
+			}
 
 			encoder.Encode(params)
 			k.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
@@ -910,10 +921,10 @@ func isFeeOverdue(miner string) bool {
 	s := userStats[miner]
 	if s.results >= 19 && !s.isIB {
 		logger_getwork.V(0).Info("Fees overdue", "miner", miner)
-		s.isIgnored = true
-		userStats[miner] = s
+		// s.isIgnored = true
+		// userStats[miner] = s
 
-		return true
+		// return true
 	}
 	if s.results > 0 && s.isIB {
 		s.results = 0

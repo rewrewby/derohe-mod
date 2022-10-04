@@ -83,6 +83,9 @@ var CountMiniOrphan int64
 var CountOrphan int64
 var CountTotalBlocks int64
 
+var NodeMaintenance bool = false
+var MaintenanceStart int64 = time.Now().Unix()
+
 func CountThreads() int {
 	return threadProfile.Count()
 }

@@ -48,6 +48,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// adding some colors
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
+
 //import "github.com/deroproject/derohe/cryptography/crypto"
 
 var mutex sync.RWMutex
@@ -594,8 +601,10 @@ func mineblock(tid int) {
 				atomic.AddUint64(&counter, 1)
 
 				if CheckPowHashBig(powhash, &diff) == true { // note we are doing a local, NW might have moved meanwhile
-					logger.V(1).Info("Successfully found DERO miniblock (going to submit)", "difficulty", myjob.Difficulty, "height", myjob.Height)
-					func() {
+
+					logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
+
+					go func() {
 						defer globals.Recover(1)
 						connection_mutex.Lock()
 						defer connection_mutex.Unlock()
@@ -614,8 +623,10 @@ func mineblock(tid int) {
 				atomic.AddUint64(&counter, 1)
 
 				if CheckPowHashBig(powhash, &diff) == true { // note we are doing a local, NW might have moved meanwhile
-					logger.V(1).Info("Successfully found DERO miniblock (going to submit)", "difficulty", myjob.Difficulty, "height", myjob.Height)
-					func() {
+
+					logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
+
+					go func() {
 						defer globals.Recover(1)
 						connection_mutex.Lock()
 						defer connection_mutex.Unlock()

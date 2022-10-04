@@ -141,43 +141,45 @@ var Testnet = CHAIN_CONFIG{Name: "testnet", // testnet will always have last 3 b
 const REMOTE_DAEMON = "89.38.99.117" // "https://rwallet.dero.live"
 
 type RUN_CONFIG struct {
-	WhitelistIncoming      bool
-	LogLevel               int8
-	OperatorName           string
-	P2PTurbo               bool
-	P2PBWFactor            int64
-	GETWorkJobDispatchTime time.Duration
-	DiagnosticCheckDelay   int64
-	BlockRejectThreshold   int64
-	PeerLatencyThreshold   time.Duration
-	OnlyTrusted            bool
-	Min_Peers              int64
-	Max_Peers              int64
-	BlockedVersions        []string
-	ErrorLogExpirySeconds  int64
-	NodeTag                string
-	NetworkStatsKeepCount  int64
-	AntiCheat              uint8
-	TraceBlocks            bool
-	TraceTx                bool
+	WhitelistIncoming       bool
+	LogLevel                int8
+	OperatorName            string
+	P2PTurbo                bool
+	P2PBWFactor             int64
+	GETWorkJobDispatchTime  time.Duration
+	DiagnosticCheckDelay    int64
+	BlockRejectThreshold    int64
+	PeerLatencyThreshold    time.Duration
+	OnlyTrusted             bool
+	Min_Peers               int64
+	Max_Peers               int64
+	BlockedVersions         []string
+	ErrorLogExpirySeconds   int64
+	NodeTag                 string
+	NetworkStatsKeepCount   int64
+	AntiCheat               uint8
+	TraceBlocks             bool
+	TraceTx                 bool
+	MinerMaintenanceMessage string
 }
 
 var RunningConfig = RUN_CONFIG{
-	WhitelistIncoming:      false,
-	LogLevel:               0,
-	OperatorName:           "Hansen33",
-	P2PTurbo:               true,
-	P2PBWFactor:            2,
-	DiagnosticCheckDelay:   3600,
-	BlockRejectThreshold:   80,
-	PeerLatencyThreshold:   time.Duration(2000 * time.Millisecond),
-	GETWorkJobDispatchTime: time.Duration(500 * time.Millisecond),
-	OnlyTrusted:            false,
-	ErrorLogExpirySeconds:  600,
-	Min_Peers:              200,
-	Max_Peers:              350,
-	NetworkStatsKeepCount:  100,
-	AntiCheat:              2,
-	TraceBlocks:            true,
-	TraceTx:                true,
+	WhitelistIncoming:       false,
+	LogLevel:                0,
+	OperatorName:            "Hansen33",
+	P2PTurbo:                true,
+	P2PBWFactor:             2,
+	DiagnosticCheckDelay:    3600,
+	BlockRejectThreshold:    80,
+	PeerLatencyThreshold:    time.Duration(2000 * time.Millisecond),
+	GETWorkJobDispatchTime:  time.Duration(500 * time.Millisecond),
+	OnlyTrusted:             false,
+	ErrorLogExpirySeconds:   600,
+	Min_Peers:               200,
+	Max_Peers:               350,
+	NetworkStatsKeepCount:   100,
+	AntiCheat:               2,
+	TraceBlocks:             true,
+	TraceTx:                 true,
+	MinerMaintenanceMessage: "System will go down for maintenance shortly",
 }

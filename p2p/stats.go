@@ -226,7 +226,7 @@ func CheckIfMiniBlockIsOrphaned(local bool, mblData block.MiniBlock, miner strin
 			logger.V(2).Info(fmt.Sprintf("Height: %d - %s Miniblock (%s) ORPHANED", mblData.Height, miner, mblData.GetHash().String()))
 
 			if local {
-				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block\t"+yellow+"("+red+"Profit Loss"+yellow+")"+reset_color+reset_color, mblData.Height, miner))
+				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block\t"+yellow+"("+red+"Profit Loss 💣"+yellow+")"+reset_color+reset_color, mblData.Height, miner))
 			} else {
 				if config.RunningConfig.TraceBlocks {
 					logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block"+reset_color, mblData.Height, miner))
@@ -275,7 +275,7 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.MiniBlock, miner string)
 			logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
 
 			if local {
-				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block\t"+yellow+"("+red+"Profit Loss"+yellow+")"+reset_color+reset_color, blockData.Height, miner))
+				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block\t"+yellow+"("+red+"Profit Loss 💣"+yellow+")"+reset_color+reset_color, blockData.Height, miner))
 			} else {
 				if config.RunningConfig.TraceBlocks {
 					logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block"+reset_color, blockData.Height, miner))
