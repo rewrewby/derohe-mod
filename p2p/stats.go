@@ -245,7 +245,7 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.MiniBlock, miner string)
 		time.Sleep(time.Second)
 		if chain.Get_Height() >= int64(blockData.Height)+1 {
 			// logger.V(2).Info(fmt.Sprintf("Height: %d - Checking if orphaned (%s)", mblData.Height, mblData.GetHash().String()))
-			block, err := chain.Load_Block_Topological_order_at_index(int64(blockData.Height))
+			block_id, err := chain.Load_Block_Topological_order_at_index(int64(blockData.Height))
 			if err != nil {
 				fails++
 				if fails == 5 {
@@ -254,10 +254,14 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.MiniBlock, miner string)
 				continue
 			}
 
-			// Is not orphan
-			if block == blockData.GetHash() {
-				logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) NOT ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
+			bl, err := chain.Load_BL_FROM_ID(block_id)
+			if err != nil {
+				logger.Error(err, "loading block", "blid", block_id, "height", blockData.Height)
+			}
 
+			// Is not orphan
+			if bl.MiniBlocks[9] == blockData {
+				// logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) NOT ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
 				return
 			}
 
