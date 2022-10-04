@@ -291,7 +291,8 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 		go LogAccept(c.Addr.String())
 
 		wallet := GetIntegratorAddressFromKeyHash(chain, bl)
-		go CheckIfBlockIsOrphaned(false, bl, wallet)
+
+		go CheckIfBlockIsOrphaned(false, bl.MiniBlocks[9], wallet)
 
 		if config.RunningConfig.TraceBlocks {
 

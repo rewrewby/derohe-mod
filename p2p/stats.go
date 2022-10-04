@@ -117,9 +117,9 @@ func AddBlockToMyOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
 	MyOrphanMiniBlocks[miner] = append(MyOrphanMiniBlocks[miner], mbl)
 }
 
-var OrphanBlocks = make(map[string][]block.Block)
+var OrphanBlocks = make(map[string][]block.MiniBlock)
 
-func AddBlockToOrphanBlockCollection(bl block.Block, miner string) {
+func AddBlockToOrphanBlockCollection(bl block.MiniBlock, miner string) {
 	orphan_block_mutex.Lock()
 	defer orphan_block_mutex.Unlock()
 	OrphanBlocks[miner] = append(OrphanBlocks[miner], bl)
@@ -129,9 +129,9 @@ func AddBlockToOrphanBlockCollection(bl block.Block, miner string) {
 	OrphanHeightCount[bl.Height] = i
 }
 
-var MyOrphanBlocks = make(map[string][]block.Block)
+var MyOrphanBlocks = make(map[string][]block.MiniBlock)
 
-func AddBlockToMyOrphanBlockCollection(bl block.Block, miner string) {
+func AddBlockToMyOrphanBlockCollection(bl block.MiniBlock, miner string) {
 	miner_mini_mutex.Lock()
 	defer miner_mini_mutex.Unlock()
 	MyOrphanBlocks[miner] = append(MyOrphanBlocks[miner], bl)
@@ -237,7 +237,7 @@ func CheckIfMiniBlockIsOrphaned(local bool, mblData block.MiniBlock, miner strin
 	}
 }
 
-func CheckIfBlockIsOrphaned(local bool, blockData block.Block, miner string) {
+func CheckIfBlockIsOrphaned(local bool, blockData block.MiniBlock, miner string) {
 
 	var fails int
 
@@ -256,6 +256,8 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.Block, miner string) {
 
 			// Is not orphan
 			if block == blockData.GetHash() {
+				logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) NOT ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
+
 				return
 			}
 
@@ -271,6 +273,7 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.Block, miner string) {
 
 			if local {
 				atomic.AddInt64(&globals.CountOrphan, 1)
+				// Update Miner
 				go AddBlockToMyOrphanBlockCollection(blockData, miner)
 			}
 			go AddBlockToOrphanBlockCollection(blockData, miner)

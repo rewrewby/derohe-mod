@@ -609,11 +609,10 @@ func newUpgrader() *websocket.Upgrader {
 				atomic.AddInt64(&CountBlocks, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
+				go p2p.CheckIfBlockIsOrphaned(true, mbl, sess.address.String())
+
 				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
 
-				//TODO: This don't work right and creates rejected?
-				// Deserialize into block does?
-				// go p2p.CheckIfBlockIsOrphaned(true, &cbl.Bl, "miner")
 			}
 			setUserStats(sess.address.String(), nodeFee)
 		}
