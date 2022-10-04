@@ -290,15 +290,15 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 		Broadcast_Block(&cbl, c.Peer_ID) // do not send back to the original peer
 		go LogAccept(c.Addr.String())
 
-		if config.RunningConfig.TraceBlocks {
+		wallet := GetIntegratorAddressFromKeyHash(chain, bl)
+		go CheckIfBlockIsOrphaned(false, bl, wallet)
 
-			wallet := GetIntegratorAddressFromKeyHash(chain, bl)
+		if config.RunningConfig.TraceBlocks {
 
 			text_color := green
 			if last_height == bl.Height {
 				// Display orphans as yellow
 				text_color = yellow
-				atomic.AddInt64(&globals.CountOrphan, 1)
 			}
 			atomic.AddInt64(&globals.CountTotalBlocks, 1)
 

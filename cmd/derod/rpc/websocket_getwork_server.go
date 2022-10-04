@@ -608,6 +608,12 @@ func newUpgrader() *websocket.Upgrader {
 				nodeFee = true
 				atomic.AddInt64(&CountBlocks, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
+				bl := block.Block{}
+				if err = bl.Deserialize(mbl_block_data_bytes); err != nil {
+					logger.V(1).Error(err, "Error Deserializing newly minted block")
+				} else {
+					go p2p.CheckIfBlockIsOrphaned(true, bl, miner)
+				}
 
 				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
 			}

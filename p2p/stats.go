@@ -96,6 +96,7 @@ func AddBlockToMyCollection(mbl block.MiniBlock, miner string) {
 }
 
 var OrphanHeightCount = make(map[uint64]int)
+
 var OrphanMiniBlocks = make(map[string][]block.MiniBlock)
 
 func AddBlockToOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
@@ -108,8 +109,35 @@ func AddBlockToOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
 	OrphanHeightCount[mbl.Height] = i
 }
 
-func CountNetworkOrphanSince(height uint64) (total int) {
+var MyOrphanMiniBlocks = make(map[string][]block.MiniBlock)
 
+func AddBlockToMyOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+	MyOrphanMiniBlocks[miner] = append(MyOrphanMiniBlocks[miner], mbl)
+}
+
+var OrphanBlocks = make(map[string][]block.Block)
+
+func AddBlockToOrphanBlockCollection(bl block.Block, miner string) {
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+	OrphanBlocks[miner] = append(OrphanBlocks[miner], bl)
+
+	i := OrphanHeightCount[bl.Height]
+	i++
+	OrphanHeightCount[bl.Height] = i
+}
+
+var MyOrphanBlocks = make(map[string][]block.Block)
+
+func AddBlockToMyOrphanBlockCollection(bl block.Block, miner string) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+	MyOrphanBlocks[miner] = append(MyOrphanBlocks[miner], bl)
+}
+
+func CountNetworkOrphanSince(height uint64) (total int) {
 	orphan_block_mutex.Lock()
 	defer orphan_block_mutex.Unlock()
 
@@ -120,14 +148,6 @@ func CountNetworkOrphanSince(height uint64) (total int) {
 	}
 
 	return total
-}
-
-var MyOrphanMiniBlocks = make(map[string][]block.MiniBlock)
-
-func AddBlockToMyOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
-	miner_mini_mutex.Lock()
-	defer miner_mini_mutex.Unlock()
-	MyOrphanMiniBlocks[miner] = append(MyOrphanMiniBlocks[miner], mbl)
 }
 
 func GetMinerOrphanCount(miner string) int {
@@ -206,6 +226,63 @@ func CheckIfMiniBlockIsOrphaned(local bool, mblData block.MiniBlock, miner strin
 				go AddBlockToMyOrphanMiniBlockCollection(mblData, miner)
 			}
 			go AddBlockToOrphanMiniBlockCollection(mblData, miner)
+
+			return
+		}
+	}
+}
+
+func CheckIfBlockIsOrphaned(local bool, blockData block.Block, miner string) {
+
+	var fails int
+
+	for {
+		time.Sleep(time.Second)
+		if chain.Get_Height() >= int64(blockData.Height)+1 {
+			// logger.V(2).Info(fmt.Sprintf("Height: %d - Checking if orphaned (%s)", mblData.Height, mblData.GetHash().String()))
+			block, err := chain.Load_Block_Topological_order_at_index(int64(blockData.Height))
+			if err != nil {
+				fails++
+				if fails == 5 {
+					return
+				}
+				continue
+			}
+			// bl, err := chain.Load_BL_FROM_ID(block)
+			// if err != nil {
+			// 	fails++
+			// 	if fails == 5 {
+			// 		return
+			// 	}
+			// 	continue
+			// }
+			// for _, mbl := range bl.MiniBlocks {
+			// 	if mbl == mblData {
+			// 		return
+			// 	}
+			// }
+
+			// Mini Block is Orphan
+
+			// Is not orphan
+			if block == blockData.GetHash() {
+				logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) NOT ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
+				return
+			}
+
+			logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
+
+			if local {
+				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block\t"+red+"("+yellow+"Profit Loss"+red+")"+reset_color+reset_color, blockData.Height, miner))
+			} else {
+				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block"+reset_color, blockData.Height, miner))
+			}
+
+			if local {
+				atomic.AddInt64(&globals.CountOrphan, 1)
+				go AddBlockToMyOrphanBlockCollection(blockData, miner)
+			}
+			go AddBlockToOrphanBlockCollection(blockData, miner)
 
 			return
 		}

@@ -127,13 +127,15 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	result.RemotePopBlockCount = globals.BlockPopCount
 	result.CountMinisRejected = CountMinisRejected
 	result.CountMinisAccepted = CountMinisAccepted
-	result.CountMinisOrphaned = globals.CountOrphan
+
+	total_orphan_blocks := globals.CountMiniOrphan + globals.CountOrphan
+	result.CountMinisOrphaned = total_orphan_blocks
 	result.CountBlocks = CountBlocks
 
 	blocksMinted := (CountMinisAccepted + CountBlocks)
 	OrphanBlockRate := float64(0)
-	if globals.CountMiniOrphan > 0 {
-		OrphanBlockRate = float64(float64(float64(globals.CountMiniOrphan)/float64(blocksMinted)) * 100)
+	if total_orphan_blocks > 0 {
+		OrphanBlockRate = float64(float64(float64(total_orphan_blocks)/float64(blocksMinted)) * 100)
 	}
 	result.OrphanBlockRate = OrphanBlockRate
 	result.MintingSuccessRate = float64(100)
