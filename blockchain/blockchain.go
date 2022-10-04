@@ -1332,8 +1332,15 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 		if config.RunningConfig.TraceTx {
 
 			height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", tx.Height)
-			txt_text := fmt.Sprintf(blue+"("+red+"%s"+blue+")"+reset_color+"", txhash)
-			type_text := red + "** UNITENTIDIED TX **"
+			txt_text := fmt.Sprintf(blue+"TXID"+reset_color+": "+blue+"%s"+reset_color+":", txhash)
+			type_text := red + "** UN-IDENTIFIED TX **"
+
+			fees_deri := tx.Fees() + tx.Value
+
+			bytes := len(tx.Serialize())
+			kiloBytes := float64(float64(bytes) / 1024)
+
+			size := fmt.Sprintf("%.3f kB", kiloBytes)
 
 			// registration tx are represented by this
 
@@ -1345,21 +1352,24 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 
 			case transaction.BURN_TX:
 
-				type_text = red + "BURN TX"
+				type_text = " 🔥 " + red + "BURN" + reset_color + " 🔥 "
 
 			case transaction.NORMAL:
 
-				type_text = blue + "Normal TX"
+				type_text = blue + "Normal"
 
 			case transaction.SC_TX:
 
 				type_text = yellow + "Smart Contract TX"
 
 			default:
-				return fmt.Errorf("such transaction type cannot appear in mempool")
+
 			}
 
-			logger.Info(fmt.Sprintf("%-s - %-30s %-30s", height_txt, type_text, txt_text))
+			fees := float64(float64(fees_deri) / 10000)
+			amount := fmt.Sprintf("%.f DERO", fees)
+
+			logger.Info(fmt.Sprintf("%-31s %-87s %-30s %-20s %-20s", height_txt, txt_text, type_text, size, amount))
 		}
 
 		return nil
