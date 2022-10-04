@@ -271,7 +271,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 			var tx transaction.Transaction
 			err = tx.Deserialize(request.CBlocks[0].Txs[j])
 			if err != nil { // we have a tx which could not be deserialized ban peer
-				c.logger.V(3).Error(err, "tx cannot be deserialized.Should be banned")
+				c.logger.Error(err, "tx cannot be deserialized.Should be banned")
 				c.exit()
 				return err
 			}

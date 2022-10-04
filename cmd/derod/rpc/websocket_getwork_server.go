@@ -577,7 +577,7 @@ func newUpgrader() *websocket.Upgrader {
 				atomic.AddInt64(&CountMinisAccepted, 1)
 				go IncreaseMinerCount(miner, sess.address.String(), "miniblocks", "")
 
-				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, x.Wallet_Address)
+				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
 				globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
@@ -608,14 +608,12 @@ func newUpgrader() *websocket.Upgrader {
 				nodeFee = true
 				atomic.AddInt64(&CountBlocks, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
-				bl := block.Block{}
-				if err = bl.Deserialize(mbl_block_data_bytes); err != nil {
-					logger.V(1).Error(err, "Error Deserializing newly minted block")
-				} else {
-					go p2p.CheckIfBlockIsOrphaned(true, bl, miner)
-				}
 
 				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
+
+				//TODO: This don't work right and creates rejected?
+				// Deserialize into block does?
+				// go p2p.CheckIfBlockIsOrphaned(true, &cbl.Bl, "miner")
 			}
 			setUserStats(sess.address.String(), nodeFee)
 		}
