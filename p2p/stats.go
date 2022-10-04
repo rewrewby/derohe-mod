@@ -213,10 +213,10 @@ func CheckIfMiniBlockIsOrphaned(local bool, mblData block.MiniBlock, miner strin
 
 			logger.V(2).Info(fmt.Sprintf("Height: %d - %s Miniblock (%s) ORPHANED", mblData.Height, miner, mblData.GetHash().String()))
 
-			if config.RunningConfig.TraceBlocks {
-				if local {
-					logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block\t"+red+"("+yellow+"Profit Loss"+red+")"+reset_color+reset_color, mblData.Height, miner))
-				} else {
+			if local {
+				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block\t"+yellow+"("+red+"Profit Loss"+yellow+")"+reset_color+reset_color, mblData.Height, miner))
+			} else {
+				if config.RunningConfig.TraceBlocks {
 					logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO mini block"+reset_color, mblData.Height, miner))
 				}
 			}
@@ -248,34 +248,20 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.Block, miner string) {
 				}
 				continue
 			}
-			// bl, err := chain.Load_BL_FROM_ID(block)
-			// if err != nil {
-			// 	fails++
-			// 	if fails == 5 {
-			// 		return
-			// 	}
-			// 	continue
-			// }
-			// for _, mbl := range bl.MiniBlocks {
-			// 	if mbl == mblData {
-			// 		return
-			// 	}
-			// }
-
-			// Mini Block is Orphan
 
 			// Is not orphan
 			if block == blockData.GetHash() {
-				logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) NOT ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
 				return
 			}
 
 			logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
 
 			if local {
-				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block\t"+red+"("+yellow+"Profit Loss"+red+")"+reset_color+reset_color, blockData.Height, miner))
+				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block\t"+yellow+"("+red+"Profit Loss"+yellow+")"+reset_color+reset_color, blockData.Height, miner))
 			} else {
-				logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block"+reset_color, blockData.Height, miner))
+				if config.RunningConfig.TraceBlocks {
+					logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block"+reset_color, blockData.Height, miner))
+				}
 			}
 
 			if local {
