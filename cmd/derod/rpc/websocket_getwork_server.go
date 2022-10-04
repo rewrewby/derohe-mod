@@ -404,8 +404,8 @@ func SendJob() {
 			params.Difficulty = diff.String()
 			params.Hansen33Mod = true
 
-			// Don't start mining before we are ready
-			if globals.CountTotalBlocks >= 1 {
+			// Don't start mining before we are ready and can win blocks
+			if globals.CountTotalBlocks >= 8 {
 
 				mbl := mbl_main
 
