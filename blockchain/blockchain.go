@@ -1378,7 +1378,10 @@ func LogTx(tx *transaction.Transaction) {
 		fees := globals.FormatMoney(tx.Fees())
 		amount := fmt.Sprintf(blue+"Fee "+yellow+"%s"+blue+" DERO", fees)
 
-		ring_size := fmt.Sprintf(blue+"Ringsize "+yellow+"%d"+reset_color, int(tx.Payloads[0].Statement.RingSize))
+		ring_size := fmt.Sprintf(blue + "Ringsize " + red + "Unknown" + reset_color)
+		if len(tx.Payloads) >= 1 {
+			ring_size = fmt.Sprintf(blue+"Ringsize "+yellow+"%d"+reset_color, int(tx.Payloads[0].Statement.RingSize))
+		}
 
 		logger.Info(fmt.Sprintf("%-31s %-30s %-35s %-35s %-30s %-90s"+reset_color, height_txt, type_text, size, amount, ring_size, txt_text))
 	}
