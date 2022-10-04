@@ -196,7 +196,7 @@ func SetLogLevel(console, logfile io.Writer, log_level int) logr.Logger {
 
 	newlogger := zapr.NewLogger(zcore) // sets up global logger
 	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
-
+	Logger = newlogger
 	return newlogger
 }
 
