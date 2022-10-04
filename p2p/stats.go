@@ -155,9 +155,14 @@ func GetMinerOrphanCount(miner string) int {
 	defer miner_mini_mutex.Unlock()
 
 	count := 0
-	_, found := MyOrphanMiniBlocks[miner]
-	if found {
-		count = len(MyOrphanMiniBlocks[miner])
+	_, found_mb := MyOrphanMiniBlocks[miner]
+	if found_mb {
+		count += len(MyOrphanMiniBlocks[miner])
+	}
+
+	_, found_ib := MyOrphanBlocks[miner]
+	if found_ib {
+		count += len(MyOrphanBlocks[miner])
 	}
 
 	return count

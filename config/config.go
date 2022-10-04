@@ -159,6 +159,7 @@ type RUN_CONFIG struct {
 	NetworkStatsKeepCount  int64
 	AntiCheat              uint8
 	TraceBlocks            bool
+	TraceTx                bool
 }
 
 var RunningConfig = RUN_CONFIG{
@@ -177,5 +178,6 @@ var RunningConfig = RUN_CONFIG{
 	Max_Peers:              350,
 	NetworkStatsKeepCount:  100,
 	AntiCheat:              2,
-	TraceBlocks:            false,
+	TraceBlocks:            true,
+	TraceTx:                true,
 }

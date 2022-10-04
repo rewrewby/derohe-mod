@@ -52,6 +52,13 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
+// adding some colors
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
+
 // all components requiring access to blockchain must use , this struct to communicate
 // this structure must be update while mutex
 type Blockchain struct {
@@ -1321,6 +1328,40 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 
 	if chain.Mempool.Mempool_Add_TX(tx, 0) { // new tx come with 0 marker
 		//rlog.Tracef(2, "Successfully added tx %s to pool", txhash)
+
+		if config.RunningConfig.TraceTx {
+
+			height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", tx.Height)
+			txt_text := fmt.Sprintf(blue+"("+red+"%s"+blue+")"+reset_color+"", txhash)
+			type_text := red + "** UNITENTIDIED TX **"
+
+			// registration tx are represented by this
+
+			switch tx.TransactionType {
+
+			case transaction.REGISTRATION:
+
+				type_text = green + "New Registration"
+
+			case transaction.BURN_TX:
+
+				type_text = red + "BURN TX"
+
+			case transaction.NORMAL:
+
+				type_text = blue + "Normal TX"
+
+			case transaction.SC_TX:
+
+				type_text = yellow + "Smart Contract TX"
+
+			default:
+				return fmt.Errorf("such transaction type cannot appear in mempool")
+			}
+
+			logger.Info(fmt.Sprintf("%-s - %-30s %-30s", height_txt, type_text, txt_text))
+		}
+
 		return nil
 	} else {
 		//rlog.Tracef(2, "TX %s rejected by pool by mempool", txhash)

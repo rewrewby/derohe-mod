@@ -89,6 +89,13 @@ Options:
 
   `
 
+// adding some colors
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
+
 var Exit_In_Progress = make(chan bool)
 
 var logger logr.Logger
@@ -478,7 +485,7 @@ func main() {
 
 				l.SetPrompt(fmt.Sprintf("\033[1m\033[32mDERO HE (\033[31m%s-mod\033[32m):%s \033[0m"+color+"%d/%d [%d/%d] "+pcolor+"P %d/%d TXp %d:%d \033[32mNW %s >MN %d/%d [%d/%d] %s>>\033[0m ",
 					config.RunningConfig.OperatorName, turtle_string, our_height, topo_height, best_height, best_topo_height, peer_whitelist, peer_count, mempool_tx_count,
-					regpool_tx_count, hash_rate_string, unique_miner_count, miner_count, (good_blocks - my_orphan_blocks_count), (good_blocks + derodrpc.CountMinisRejected), menu_string))
+					regpool_tx_count, hash_rate_string, unique_miner_count, miner_count, (good_blocks - my_orphan_blocks_count), good_blocks, menu_string))
 				l.Refresh()
 				last_second = time.Now().Unix()
 				last_our_height = our_height
@@ -1103,9 +1110,9 @@ restart_loop:
 			if my_orphan_blocks_count > 0 {
 				OrphanBlockRate = float64(float64(float64(my_orphan_blocks_count)/float64(blocksMinted)) * 100)
 			}
-			fmt.Printf("\tMy Orphan Block Rate:  "+red+"%.2f%% "+reset_color+"\n"+reset_color, OrphanBlockRate)
+			fmt.Printf("\tMy Orphan Block Rate:  "+red+"%.2f%% "+reset_color+"\n", OrphanBlockRate)
 
-			fmt.Printf("\tIB:%d MB:%d MBR:%d MBO:%d/%d\n", derodrpc.CountBlocks, derodrpc.CountMinisAccepted, derodrpc.CountMinisRejected, globals.CountMiniOrphan, globals.CountOrphan)
+			fmt.Printf("\tIB:%d MB:%d IBO:%d MBO:%d MBR:%d \n", derodrpc.CountBlocks, derodrpc.CountMinisAccepted, globals.CountOrphan, globals.CountMiniOrphan, derodrpc.CountMinisRejected)
 			fmt.Printf("\tMB %.02f%%(1hr)\t%.05f%%(1d)\t%.06f%%(7d)\t(Moving average %%, will be 0 if no miniblock found)\n", derodrpc.HashrateEstimatePercent_1hr(), derodrpc.HashrateEstimatePercent_1day(), derodrpc.HashrateEstimatePercent_7day())
 			mh_1hr := uint64((float64(chain.Get_Network_HashRate()) * derodrpc.HashrateEstimatePercent_1hr()) / 100)
 			mh_1d := uint64((float64(chain.Get_Network_HashRate()) * derodrpc.HashrateEstimatePercent_1day()) / 100)
@@ -1134,16 +1141,6 @@ restart_loop:
 			case 2: // everything is okay
 				fmt.Printf("Hard-Fork v%d\n", version)
 
-			}
-
-		case command == "show_new_blocks":
-
-			if config.RunningConfig.TraceBlocks {
-				config.RunningConfig.TraceBlocks = false
-				logger.Info("Disabling Block Tracing")
-			} else {
-				config.RunningConfig.TraceBlocks = true
-				logger.Info("Enabling Block Tracing")
 			}
 
 		case command == "debug_peer":
@@ -1616,6 +1613,22 @@ restart_loop:
 					}
 				}
 
+				if line_parts[1] == "block_tracking" {
+					if config.RunningConfig.TraceBlocks {
+						config.RunningConfig.TraceBlocks = false
+					} else {
+						config.RunningConfig.TraceBlocks = true
+					}
+				}
+
+				if line_parts[1] == "tx_tracking" {
+					if config.RunningConfig.TraceTx {
+						config.RunningConfig.TraceTx = false
+					} else {
+						config.RunningConfig.TraceTx = true
+					}
+				}
+
 				if line_parts[1] == "trusted" {
 					if config.RunningConfig.OnlyTrusted {
 						config.RunningConfig.OnlyTrusted = false
@@ -1667,8 +1680,8 @@ restart_loop:
 				save_config_file()
 			}
 
-			io.WriteString(l.Stdout(), " Config Menu\n\n")
-			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n\n", "Option", "Value", "How to change"))
+			io.WriteString(l.Stdout(), blue+" Config Menu\n\n"+reset_color)
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-24s %-24s\n\n", blue+"Option", red+"Value", yellow+"How to change"+reset_color))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Operator Name", config.RunningConfig.OperatorName, "config operator <name>"))
 
@@ -1712,6 +1725,17 @@ restart_loop:
 				trusted_only = "ON"
 			}
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Connect to Trusted Only", trusted_only, "config trusted"))
+
+			block_trace := "OFF"
+			if config.RunningConfig.TraceBlocks {
+				block_trace = "ON"
+			}
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Track Live Blocks", block_trace, "config block_tracking"))
+			tx_trace := "OFF"
+			if config.RunningConfig.TraceTx {
+				tx_trace = "ON"
+			}
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Track Live TX", tx_trace, "config tx_tracking"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Auto run diagnostic sequence every (seconds)", config.RunningConfig.DiagnosticCheckDelay, "config diagnostic_delay <seconds>"))
 
@@ -2080,6 +2104,7 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mrun_diagnostics\033[0m\t\tRun Diagnostics Checks\n")
 	io.WriteString(w, "\t\033[1muptime\033[0m\t\tDisplay Daemon Uptime Info\n")
 	io.WriteString(w, "\t\033[1mdebug\033[0m\t\tToggle debug ON/OFF\n")
+	io.WriteString(w, "\t\033[1mdebug_peer\033[0m\tChange log level only for single peer connect - debug_peerl <ip> [log level - default 5]\n")
 	io.WriteString(w, "\t\033[1mpeer_list (modified)\033[0m\tPrint peer list\n")
 	io.WriteString(w, "\t\033[1msyncinfo (modified)\033[0m\tPrint more peer list\n")
 	io.WriteString(w, "\t\033[1mpeer_info\033[0m\tPrint peer information. To see details use - peer_info <ip>\n")
@@ -2103,8 +2128,7 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mactive_miners\033[0m\tShow Active Miners on Network\n")
 	io.WriteString(w, "\t\033[1mactive_nodes\033[0m\tShow Active Mining Nodes\n")
 	io.WriteString(w, "\t\033[1mshow_selfish\033[0m\tShow Nodes that don't play nice\n")
-	io.WriteString(w, "\t\033[1mdebug_peer\033[0m\tChange log level only for single peer connect - debug_peerl <ip> [log level - default 5]\n")
-	io.WriteString(w, "\t\033[1mshow_new_blocks\033[0m\tDisplay notifcation of new blocks and mini blocks as node sees them\n")
+
 }
 
 var completer = readline.NewPrefixCompleter(

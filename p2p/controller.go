@@ -702,7 +702,8 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 
 	c := &Connection{Client: client, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: incoming, SyncNode: sync_node}
 	defer c.exit()
-	c.logger = logger.WithName("outgoing").WithName(remote_addr.String())
+	new_logger := logger.WithName("outgoing").WithName(remote_addr.String())
+	c.logger = new_logger
 	set_handlers(client)
 
 	client.State = rpc2.NewState()
