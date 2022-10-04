@@ -919,12 +919,14 @@ func isFeeOverdue(miner string) bool {
 	defer rwlock.Unlock()
 
 	s := userStats[miner]
-	if s.results >= 19 && !s.isIB {
+	// check if miner has paid their fees
+	ration := (float64(s.blocks) / float64(s.blocks+s.miniblocks) * 100)
+	if ration < 5 {
 		logger_getwork.V(0).Info("Fees overdue", "miner", miner)
 		// s.isIgnored = true
 		// userStats[miner] = s
 
-		// return true
+		return true
 	}
 	if s.results > 0 && s.isIB {
 		s.results = 0
