@@ -568,7 +568,7 @@ func newUpgrader() *websocket.Upgrader {
 			if err = mbl.Deserialize(mbl_block_data_bytes); err != nil {
 				logger.V(1).Error(err, "Error Deserializing newly minted block")
 			} else {
-				go p2p.AddBlockToMyCollection(mbl, c.RemoteAddr().String())
+				go p2p.AddBlockToMyCollection(mbl, sess.address.String())
 			}
 
 			//logger.Infof("Submitted block %s accepted", blid)

@@ -86,7 +86,6 @@ var log_miniblock_mutex sync.Mutex
 var MyMiniBlocks = make(map[string][]block.MiniBlock)
 
 var miner_mini_mutex sync.Mutex
-var orphan_block_mutex sync.Mutex
 
 func AddBlockToMyCollection(mbl block.MiniBlock, miner string) {
 	miner_mini_mutex.Lock()
@@ -95,9 +94,12 @@ func AddBlockToMyCollection(mbl block.MiniBlock, miner string) {
 	MyMiniBlocks[miner] = append(MyMiniBlocks[miner], mbl)
 }
 
+var orphan_block_mutex sync.Mutex
 var OrphanHeightCount = make(map[uint64]int)
-
 var OrphanMiniBlocks = make(map[string][]block.MiniBlock)
+var OrphanBlocks = make(map[string][]block.MiniBlock)
+var MyOrphanMiniBlocks = make(map[string][]block.MiniBlock)
+var MyOrphanBlocks = make(map[string][]block.MiniBlock)
 
 func AddBlockToOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
 	orphan_block_mutex.Lock()
@@ -109,16 +111,6 @@ func AddBlockToOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
 	OrphanHeightCount[mbl.Height] = i
 }
 
-var MyOrphanMiniBlocks = make(map[string][]block.MiniBlock)
-
-func AddBlockToMyOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
-	miner_mini_mutex.Lock()
-	defer miner_mini_mutex.Unlock()
-	MyOrphanMiniBlocks[miner] = append(MyOrphanMiniBlocks[miner], mbl)
-}
-
-var OrphanBlocks = make(map[string][]block.MiniBlock)
-
 func AddBlockToOrphanBlockCollection(bl block.MiniBlock, miner string) {
 	orphan_block_mutex.Lock()
 	defer orphan_block_mutex.Unlock()
@@ -129,12 +121,28 @@ func AddBlockToOrphanBlockCollection(bl block.MiniBlock, miner string) {
 	OrphanHeightCount[bl.Height] = i
 }
 
-var MyOrphanBlocks = make(map[string][]block.MiniBlock)
-
-func AddBlockToMyOrphanBlockCollection(bl block.MiniBlock, miner string) {
+func AddBlockToMyOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
 	miner_mini_mutex.Lock()
 	defer miner_mini_mutex.Unlock()
-	MyOrphanBlocks[miner] = append(MyOrphanBlocks[miner], bl)
+	MyOrphanMiniBlocks[miner] = append(MyOrphanMiniBlocks[miner], mbl)
+
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+	i := OrphanHeightCount[mbl.Height]
+	i++
+	OrphanHeightCount[mbl.Height] = i
+}
+
+func AddBlockToMyOrphanBlockCollection(mbl block.MiniBlock, miner string) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+	MyOrphanBlocks[miner] = append(MyOrphanBlocks[miner], mbl)
+
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+	i := OrphanHeightCount[mbl.Height]
+	i++
+	OrphanHeightCount[mbl.Height] = i
 }
 
 func CountNetworkOrphanSince(height uint64) (total int) {
@@ -174,6 +182,13 @@ func IsMiniBlockOrphan(mbl block.MiniBlock) bool {
 
 	for miner, _ := range OrphanMiniBlocks {
 		for _, orphan := range OrphanMiniBlocks[miner] {
+			if orphan == mbl {
+				return true
+			}
+		}
+	}
+	for miner, _ := range OrphanBlocks {
+		for _, orphan := range OrphanBlocks[miner] {
 			if orphan == mbl {
 				return true
 			}
@@ -314,11 +329,11 @@ func UpdateLiveBlockData() {
 			continue
 		}
 
-		// if IsOrphan(bl.Block) {
-		// 	bl.IsOrphan = true
-		// } else {
-		bl.IsOrphan = false
-		// }
+		if IsMiniBlockOrphan(bl.Block.MiniBlocks[9]) {
+			bl.IsOrphan = true
+		} else {
+			bl.IsOrphan = false
+		}
 		FinalBlockLogs[key] = bl
 
 	}
