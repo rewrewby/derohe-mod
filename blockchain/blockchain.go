@@ -1233,6 +1233,7 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 					return fmt.Errorf("address already registered")
 				} else { // add  to regpool
 					if chain.Regpool.Regpool_Add_TX(tx, 0) {
+						go LogTx(tx)
 						return nil
 					} else {
 						return fmt.Errorf("registration for address is already pending")
@@ -1328,56 +1329,59 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 
 	if chain.Mempool.Mempool_Add_TX(tx, 0) { // new tx come with 0 marker
 		//rlog.Tracef(2, "Successfully added tx %s to pool", txhash)
-
-		if config.RunningConfig.TraceTx {
-
-			height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", tx.Height)
-			txt_text := fmt.Sprintf(blue+"TXID"+reset_color+": "+blue+"%s"+reset_color+":", txhash)
-			type_text := red + "** UN-IDENTIFIED TX **"
-
-			fees_deri := tx.Fees() + tx.Value
-
-			bytes := len(tx.Serialize())
-			kiloBytes := float64(float64(bytes) / 1024)
-
-			size := fmt.Sprintf("%.3f kB", kiloBytes)
-
-			// registration tx are represented by this
-
-			switch tx.TransactionType {
-
-			case transaction.REGISTRATION:
-
-				type_text = green + "New Registration"
-
-			case transaction.BURN_TX:
-
-				type_text = " 🔥 " + red + "BURN" + reset_color + " 🔥 "
-
-			case transaction.NORMAL:
-
-				type_text = blue + "Normal"
-
-			case transaction.SC_TX:
-
-				type_text = yellow + "Smart Contract TX"
-
-			default:
-
-			}
-
-			fees := float64(float64(fees_deri) / 10000)
-			amount := fmt.Sprintf("%.f DERO", fees)
-
-			logger.Info(fmt.Sprintf("%-31s %-87s %-30s %-20s %-20s", height_txt, txt_text, type_text, size, amount))
-		}
-
+		go LogTx(tx)
 		return nil
 	} else {
 		//rlog.Tracef(2, "TX %s rejected by pool by mempool", txhash)
 		return fmt.Errorf("TX %s rejected by pool by mempool", txhash)
 	}
 
+}
+
+func LogTx(tx *transaction.Transaction) {
+	if config.RunningConfig.TraceTx {
+
+		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", tx.Height)
+		txt_text := fmt.Sprintf(blue+"TXID"+reset_color+": "+blue+"%s"+reset_color+"", tx.GetHash())
+		type_text := red + "** UN-IDENTIFIED TX **"
+
+		// fees_deri := tx.Fees()
+		bytes := len(tx.Serialize())
+		kiloBytes := float64(float64(bytes) / 1024)
+
+		size := fmt.Sprintf(blue+"Size "+yellow+"%.3f"+blue+" kB", kiloBytes)
+
+		// registration tx are represented by this
+
+		switch tx.TransactionType {
+
+		case transaction.REGISTRATION:
+
+			type_text = green + "New Registration" + reset_color + ""
+
+		case transaction.BURN_TX:
+
+			type_text = " 🔥 " + red + "BURN" + reset_color + " 🔥 "
+
+		case transaction.NORMAL:
+
+			type_text = blue + "Normal TX" + reset_color + ""
+
+		case transaction.SC_TX:
+
+			type_text = yellow + "Smart Contract TX" + reset_color + ""
+
+		default:
+
+		}
+
+		fees := globals.FormatMoney(tx.Fees())
+		amount := fmt.Sprintf(blue+"Fee "+yellow+"%s"+blue+" DERO", fees)
+
+		ring_size := fmt.Sprintf(blue+"Ringsize "+yellow+"%d"+reset_color, int(tx.Payloads[0].Statement.RingSize))
+
+		logger.Info(fmt.Sprintf("%-31s %-30s %-35s %-35s %-30s %-90s"+reset_color, height_txt, type_text, size, amount, ring_size, txt_text))
+	}
 }
 
 // side blocks are blocks which lost the race the to become part

@@ -199,7 +199,7 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 
 	if counter == "miniblocks" {
 		i.miniblocks++
-		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO mini block\t"+red+"("+blue+"going to submit"+red+")"+reset_color, chain.Get_Height()+1, wallet))
+		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit"+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
 	}
 
 	if counter == "rejected" {
@@ -575,10 +575,9 @@ func newUpgrader() *websocket.Upgrader {
 			if blid.IsZero() {
 				sess.miniblocks++
 				atomic.AddInt64(&CountMinisAccepted, 1)
-				go IncreaseMinerCount(miner, sess.address.String(), "miniblocks", "")
-
-				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
 				globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+				go IncreaseMinerCount(miner, sess.address.String(), "miniblocks", fmt.Sprintf("%d", globals.MiniBlocksCollectionCount))
+				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
 				rate_lock.Lock()

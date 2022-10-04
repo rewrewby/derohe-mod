@@ -226,7 +226,7 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 				wallet_color := blue
 
 				// check if wallet is local and make green
-				logger.Info(fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+" - "+wallet_color+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block", mbl.Height, wallet))
+				logger.Info(fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+" - "+wallet_color+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%d:9]", mbl.Height, wallet, globals.MiniBlocksCollectionCount))
 			}
 
 			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
