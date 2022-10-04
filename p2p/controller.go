@@ -710,7 +710,7 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 
 	go func() {
 		time.Sleep(2 * time.Second)
-		c.logger = logger.WithName("outgoing2").WithName(remote_addr.String())
+		// c.logger = logger.WithName("outgoing2").WithName(remote_addr.String())
 		c.dispatch_test_handshake()
 	}()
 
