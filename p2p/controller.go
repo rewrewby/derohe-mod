@@ -501,11 +501,12 @@ func maintain_connection_to_peers() {
 
 		peer := find_peer_to_connect(1)
 		if peer != nil && !IsAddressConnected(ParseIPNoError(peer.Address)) {
+			sync := false
 			if IsTrustedIP(peer.Address) {
-				go maintain_outgoing_priority_connection(peer.Address, true)
-			} else {
-				go connect_with_endpoint(peer.Address, false)
+				sync = true
 			}
+
+			go connect_with_endpoint(peer.Address, sync)
 
 		}
 	}
