@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"bytes"
@@ -203,7 +204,17 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 
 	if counter == "miniblocks" {
 		i.miniblocks++
-		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
+
+		emoji := "🏆"
+		text_color := green
+		if s, err := strconv.ParseInt(argument, 10, 64); err == nil {
+			if s > 9 {
+				emoji = "😅"
+				text_color = yellow
+			}
+		}
+
+		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit "+emoji+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
 	}
 
 	if counter == "rejected" {

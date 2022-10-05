@@ -63,7 +63,7 @@ func LoadTrustedList() {
 	}
 
 	for Address, _ := range trusted_map {
-		ConnecToNode(Address)
+		go ConnecToNode(Address)
 	}
 
 }
@@ -102,10 +102,6 @@ func Add_Trusted(Address string) {
 		if ip == ParseIPNoError(Address) {
 			trusted_map[ip] = int64(time.Now().UTC().Unix())
 			logger.Info(fmt.Sprintf("Address: %s (%s) - Added to Trusted List", ip, c.Tag))
-			go ConnecToNode(ip)
-		} else if ParseIPNoError(Address) == Address {
-			trusted_map[Address] = int64(time.Now().UTC().Unix())
-			logger.Info(fmt.Sprintf("Address: %s - Added to Trusted List", Address))
 			go ConnecToNode(ip)
 		}
 
