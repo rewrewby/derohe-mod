@@ -304,6 +304,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 			atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
 			last_height = bl.Height
+
 			logger.Info(fmt.Sprintf(text_color+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+text_color+"Successfully found DERO integrator block", last_height, wallet))
 
 		}

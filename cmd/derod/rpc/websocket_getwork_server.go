@@ -23,7 +23,9 @@ import (
 	"sync/atomic"
 
 	"github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/blockchain"
 	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/derohe/cryptography/crypto"
 	"github.com/deroproject/derohe/globals"
 	"github.com/deroproject/derohe/p2p"
 	"github.com/deroproject/derohe/rpc"
@@ -64,14 +66,6 @@ type user_session struct {
 	tag           string
 }
 
-type user_stats struct {
-	miniblocks uint64
-	blocks     uint64
-	results    uint8
-	isIB       bool
-	isIgnored  bool
-}
-
 type banned struct {
 	fail_count uint8
 	timestamp  time.Time
@@ -79,7 +73,6 @@ type banned struct {
 
 var client_list_mutex sync.Mutex
 var client_list = map[*websocket.Conn]*user_session{}
-var userStats = map[string]user_stats{}
 var ban_list = make(map[string]banned)
 
 var miners_count int
@@ -87,7 +80,6 @@ var miners_count int
 // this will track miniblock rate,
 var mini_found_time []int64 // this array contains a epoch timestamp in int64
 var rate_lock sync.Mutex
-var rwlock sync.RWMutex
 
 // this function will return wrong result if too wide time glitches happen to system clock
 func Counter(seconds int64) (r int) { // we need atleast 1 mini to find a rate
@@ -164,8 +156,10 @@ type inner_miner_stats struct {
 	rejected   uint64
 	orphaned   uint64
 	// hashrate   float64
-	lasterr string
-	miners  int64
+	lasterr     string
+	miners      int64
+	feesoverdue bool
+	feeaddress  string
 }
 
 var miner_stats_mutex sync.Mutex
@@ -176,6 +170,16 @@ var yellow string = "\033[33m"     // make prompt yellow
 var red string = "\033[31m"        // make prompt red
 var blue string = "\033[34m"       // blue color
 var reset_color string = "\033[0m" // reset color
+
+func getMinerStats(wallet string) (stats inner_miner_stats) {
+
+	miner_stats_mutex.Lock()
+	defer miner_stats_mutex.Unlock()
+
+	stats = miner_stats[wallet]
+
+	return stats
+}
 
 func IncreaseMinerCount(ip string, wallet string, counter string, argument string) {
 
@@ -212,6 +216,19 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 
 	if counter == "lasterror" {
 		i.lasterr = argument
+	}
+
+	if counter == "feeisdue" {
+		i.feesoverdue = true
+		i.feeaddress = argument
+		logger.Info(fmt.Sprintf("Fee is due for %s", wallet))
+		i.lasterr = "! Cheater !"
+
+	}
+	if counter == "feeispaid" {
+		i.feesoverdue = false
+		i.blocks++
+		i.lasterr = "Redeemed Cheater"
 	}
 
 	miner_stats[wallet] = i
@@ -410,21 +427,19 @@ func SendJob() {
 				mbl := mbl_main
 
 				if !mbl.Final { //write miners address only if possible
-					if !isFeeOverdue(v.address.String()) {
-						copy(mbl.KeyHash[:], v.address_sum[:])
+					miner_stat := getMinerStats(v.address.String())
+
+					// anto cheat
+					if miner_stat.feesoverdue && config.RunningConfig.AntiCheat {
+						logger.V(1).Info(fmt.Sprintf("Packing template with integrator address for cheater (%s)", v.address.String()))
+						addr := chain.IntegratorAddress()
+						addr_raw := addr.PublicKey.EncodeCompressed()
+						fee_address_sum := graviton.Sum(addr_raw)
+						copy(mbl.KeyHash[:], fee_address_sum[:])
+						params.LastError = "Cheating detected.. Fees are overdue! - forced mining in progress"
 					} else {
-						switch config.RunningConfig.AntiCheat {
-						// allow cheating
-						case 0:
-							copy(mbl.KeyHash[:], v.address_sum[:])
-							// ban cheater
-						case 1:
-							banCheater(ParseIPNoError(k.RemoteAddr().String()), v.address.String())
-							// anti-cheat solution
-						case 2:
-							return
-						default:
-						}
+						copy(mbl.KeyHash[:], v.address_sum[:])
+
 					}
 				}
 
@@ -514,6 +529,26 @@ func MinerHashrate(miner string) (hashrate float64) {
 	return hashrate
 }
 
+func GetMinerAddressFromKeyHash(chain *blockchain.Blockchain, mbl block.MiniBlock) string {
+
+	if toporecord, err1 := chain.Store.Topo_store.Read(chain.Get_Height()); err1 == nil { // we must now fill in compressed ring members
+		if ss, err1 := chain.Store.Balance_store.LoadSnapshot(toporecord.State_Version); err1 == nil {
+			if balance_tree, err1 := ss.GetTree(config.BALANCE_TREE); err1 == nil {
+				bits, key, _, err1 := balance_tree.GetKeyValueFromHash(mbl.KeyHash[0:16])
+				if err1 != nil || bits >= 120 {
+					return ""
+				}
+				if addr, err1 := rpc.NewAddressFromCompressedKeys(key); err1 == nil {
+					return addr.String()
+				}
+
+			}
+		}
+	}
+
+	return ""
+}
+
 func newUpgrader() *websocket.Upgrader {
 	u := websocket.NewUpgrader()
 
@@ -555,18 +590,7 @@ func newUpgrader() *websocket.Upgrader {
 			return
 		}
 
-		s := userStats[sess.address.String()]
-		if s.isIgnored {
-			var mblCheck block.MiniBlock
-
-			_ = mblCheck.Deserialize(mbl_block_data_bytes)
-			if !mblCheck.Final {
-				return
-			}
-		}
-
 		var tstamp, extra uint64
-		var nodeFee bool
 		fmt.Sscanf(p.JobID, "%d.%d", &tstamp, &extra)
 
 		_, blid, sresult, err := chain.Accept_new_block(tstamp, mbl_block_data_bytes)
@@ -580,6 +604,26 @@ func newUpgrader() *websocket.Upgrader {
 				logger.V(1).Error(err, "Error Deserializing newly minted block")
 			} else {
 				go p2p.AddBlockToMyCollection(mbl, sess.address.String())
+			}
+
+			integrator_address_hashed_key := graviton.Sum(chain.IntegratorAddress().Compressed())
+
+			var miner_hash crypto.Hash
+			copy(miner_hash[:], mbl.KeyHash[:])
+
+			miner_stat := getMinerStats(sess.address.String())
+			if miner_stat.feesoverdue {
+
+				logger.V(2).Info(fmt.Sprintf("Checking if Cheater (%s) has paid his due(s)", sess.address.String()))
+
+				if integrator_address_hashed_key == miner_hash {
+					logger.V(2).Info(fmt.Sprintf("Cheater (%s) has paid his due(s)", sess.address.String()))
+					go IncreaseMinerCount(miner, sess.address.String(), "feeispaid", "")
+					sess.blocks++
+				} else {
+					logger.Info(fmt.Sprintf("Minted block for own (%s) vs. (%s) and is still cheating! Anti Cheat not working!", miner_hash, miner_stat.feeaddress))
+				}
+
 			}
 
 			//logger.Infof("Submitted block %s accepted", blid)
@@ -615,7 +659,6 @@ func newUpgrader() *websocket.Upgrader {
 
 			} else {
 				sess.blocks++
-				nodeFee = true
 				atomic.AddInt64(&CountBlocks, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
@@ -624,7 +667,21 @@ func newUpgrader() *websocket.Upgrader {
 				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
 
 			}
-			setUserStats(sess.address.String(), nodeFee)
+
+			if config.RunningConfig.AntiCheat {
+				cheat_ratio := 0.0
+				if miner_stat.blocks >= 1 && miner_stat.miniblocks >= 1 {
+					cheat_ratio = float64(float64(miner_stat.blocks)/float64(miner_stat.blocks+miner_stat.miniblocks)) * 100
+				}
+
+				if miner_stat.miniblocks > 11 && cheat_ratio <= 5 {
+
+					go IncreaseMinerCount(miner, sess.address.String(), "feeisdue", chain.IntegratorAddress().String())
+
+					logger.V(1).Info(fmt.Sprintf("Cheater (%s) - marking session for repacking", sess.address.String()))
+				}
+			}
+
 		}
 
 		if !sresult || err != nil {
@@ -804,9 +861,6 @@ func Getwork_server() {
 		}
 	}()
 
-	logger.Info("Waiting 5 second to start getwork")
-	time.Sleep(5 * time.Second)
-
 	if err = svr.Start(); err != nil {
 		logger_getwork.Error(err, "nbio.Start failed.")
 		return
@@ -895,75 +949,4 @@ func ParseIP(s string) (string, error) {
 func ParseIPNoError(s string) string {
 	ip, _ := ParseIP(s)
 	return ip
-}
-
-func setUserStats(miner string, block bool) {
-
-	rwlock.Lock()
-	defer rwlock.Unlock()
-
-	s := userStats[miner]
-	if block {
-		s.blocks++
-		s.isIB = true
-	} else {
-		s.miniblocks++
-	}
-	s.results++
-	userStats[miner] = s
-}
-
-func isFeeOverdue(miner string) bool {
-
-	rwlock.Lock()
-	defer rwlock.Unlock()
-
-	s := userStats[miner]
-	// check if miner has paid their fees
-	ration := (float64(s.blocks) / float64(s.blocks+s.miniblocks) * 100)
-	if s.miniblocks >= 20 && ration <= 5 {
-		logger_getwork.V(0).Info("Fees overdue", "miner", miner)
-		s.isIgnored = true
-		userStats[miner] = s
-
-		return true
-	}
-	if s.results > 0 && s.isIB {
-		s.results = 0
-		s.isIB = false
-		s.isIgnored = false
-		userStats[miner] = s
-	}
-
-	return false
-}
-
-func banCheater(ip string, wallet string) {
-
-	rwlock.Lock()
-	defer rwlock.Unlock()
-
-	i := miner_stats[wallet]
-
-	if i.miniblocks >= 5 {
-
-		// Check if this is a cheater
-		ratio := 0.0
-		if i.blocks > 0 {
-			ratio = float64(float64(i.blocks)/float64(i.blocks+i.miniblocks)) * 100
-		}
-
-		if i.blocks == 0 || ratio <= 5.0 {
-			rate_lock.Lock()
-			defer rate_lock.Unlock()
-
-			x := ban_list[ip]
-			x.fail_count = 255
-
-			logger_getwork.V(0).Info(fmt.Sprintf("Bad miner (IB:%d MB:%d - %.1f%%)", i.blocks, i.miniblocks, ratio), "Wallet", wallet, "Address", ip, "Info", "Cheater")
-
-			ban_list[ip] = x
-		}
-
-	}
 }

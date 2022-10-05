@@ -1676,15 +1676,15 @@ restart_loop:
 					new_tag = strings.TrimRight(new_tag, " ")
 					p2p.SetNodeTag(new_tag)
 				}
-				if line_parts[1] == "anti_cheat" && len(line_parts) == 3 {
-					mode, err := strconv.Atoi(line_parts[2])
-					if err == nil {
-						if mode >= 0 && mode < 3 {
-							config.RunningConfig.AntiCheat = uint8(mode)
-							io.WriteString(l.Stdout(), fmt.Sprintf("Anti cheat mode: %d\n", mode))
-						}
+				if line_parts[1] == "anti_cheat" && len(line_parts) == 2 {
+
+					if config.RunningConfig.AntiCheat {
+						config.RunningConfig.AntiCheat = false
+						io.WriteString(l.Stderr(), "anti_cheat disabled\n")
+
 					} else {
-						io.WriteString(l.Stderr(), "anti_cheat <mode> (0 = allow, 1 = ban, 2 = enable protection)\n")
+						config.RunningConfig.AntiCheat = true
+						io.WriteString(l.Stderr(), "anti_cheat enabled\n")
 					}
 				}
 				save_config_file()
@@ -1748,6 +1748,12 @@ restart_loop:
 				tx_trace = "ON"
 			}
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Track Live TX", tx_trace, "config tx_tracking"))
+
+			anto_cheat := "OFF"
+			if config.RunningConfig.AntiCheat {
+				anto_cheat = "ON"
+			}
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Anti Cheat (Forced Mining Solo Fees)", anto_cheat, "config anti_cheat"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Auto run diagnostic sequence every (seconds)", config.RunningConfig.DiagnosticCheckDelay, "config diagnostic_delay <seconds>"))
 

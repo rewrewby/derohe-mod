@@ -157,7 +157,7 @@ type RUN_CONFIG struct {
 	ErrorLogExpirySeconds   int64
 	NodeTag                 string
 	NetworkStatsKeepCount   int64
-	AntiCheat               uint8
+	AntiCheat               bool
 	TraceBlocks             bool
 	TraceTx                 bool
 	MinerMaintenanceMessage string
@@ -178,7 +178,7 @@ var RunningConfig = RUN_CONFIG{
 	Min_Peers:               200,
 	Max_Peers:               350,
 	NetworkStatsKeepCount:   100,
-	AntiCheat:               2,
+	AntiCheat:               true,
 	TraceBlocks:             true,
 	TraceTx:                 true,
 	MinerMaintenanceMessage: "System will go down for maintenance shortly",
