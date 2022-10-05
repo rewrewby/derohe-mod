@@ -228,7 +228,7 @@ func IncreaseMinerCount(ip string, wallet string, counter string, argument strin
 	if counter == "feeispaid" {
 		i.feesoverdue = false
 		i.blocks++
-		i.lasterr = "Redeemed Cheater"
+		i.lasterr = argument
 	}
 
 	miner_stats[wallet] = i
@@ -431,12 +431,12 @@ func SendJob() {
 
 					// anto cheat
 					if miner_stat.feesoverdue && config.RunningConfig.AntiCheat {
-						logger.V(1).Info(fmt.Sprintf("Packing template with integrator address for cheater (%s)", v.address.String()))
+						// logger.V(3).Info(fmt.Sprintf("Packing template with integrator address for cheater (%s)", v.address.String()))
 						addr := chain.IntegratorAddress()
 						addr_raw := addr.PublicKey.EncodeCompressed()
 						fee_address_sum := graviton.Sum(addr_raw)
 						copy(mbl.KeyHash[:], fee_address_sum[:])
-						params.LastError = "Cheating detected.. Fees are overdue! - forced mining in progress"
+						// params.LastError = "Cheating detected.. Fees are overdue! - forced mining in progress"
 					} else {
 						copy(mbl.KeyHash[:], v.address_sum[:])
 
@@ -606,22 +606,23 @@ func newUpgrader() *websocket.Upgrader {
 				go p2p.AddBlockToMyCollection(mbl, sess.address.String())
 			}
 
-			integrator_address_hashed_key := graviton.Sum(chain.IntegratorAddress().Compressed())
-
-			var miner_hash crypto.Hash
-			copy(miner_hash[:], mbl.KeyHash[:])
-
 			miner_stat := getMinerStats(sess.address.String())
-			if miner_stat.feesoverdue {
+			if miner_stat.feesoverdue && config.RunningConfig.AntiCheat {
 
-				logger.V(2).Info(fmt.Sprintf("Checking if Cheater (%s) has paid his due(s)", sess.address.String()))
+				integrator_address_hashed_key := graviton.Sum(chain.IntegratorAddress().Compressed())
 
-				if integrator_address_hashed_key == miner_hash {
-					logger.V(2).Info(fmt.Sprintf("Cheater (%s) has paid his due(s)", sess.address.String()))
-					go IncreaseMinerCount(miner, sess.address.String(), "feeispaid", "")
+				var miner_hash crypto.Hash
+				copy(miner_hash[:], mbl.KeyHash[:])
+
+				logger.Info(fmt.Sprintf("Checking if Cheater (%s) has paid his due(s)", sess.address.String()))
+
+				if !blid.IsZero() || integrator_address_hashed_key == miner_hash {
+					logger.Info(fmt.Sprintf("Cheater (%s) has paid his due(s)", sess.address.String()))
+					go IncreaseMinerCount(miner, sess.address.String(), "feeispaid", "Cheater has Paid!")
 					sess.blocks++
 				} else {
-					logger.Info(fmt.Sprintf("Minted block for own (%s) vs. (%s) and is still cheating! Anti Cheat not working!", miner_hash, miner_stat.feeaddress))
+					logger.Info(fmt.Sprintf("Minted block for own (%s) vs. (%s) and is still cheating! Anti Cheat not working!", integrator_address_hashed_key, miner_hash))
+					go IncreaseMinerCount(miner, sess.address.String(), "feeispaid", "No match for block!")
 				}
 
 			}
