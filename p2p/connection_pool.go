@@ -107,9 +107,10 @@ type Connection struct {
 	Mutex sync.Mutex // used only by connection go routine
 }
 
-func ConnectionSetLogger(newlogger *logr.Logger) {
+func SetConnectionLogger(newlogger *logr.Logger) {
 
-	logger = *newlogger
+	mylogger := *newlogger
+	logger = mylogger
 
 }
 
@@ -287,7 +288,7 @@ func ping_loop() {
 				if err := c.Client.CallWithContext(ctx, "Peer.Ping", request, &response); err != nil {
 					// peer_log := globals.Logger.WithName("peer2").WithName(c.Addr.String())
 					// peer_log.V(2).Error(err, "ping failed")
-					c.logger.V(2).Error(err, "ping failed")
+					c.logger.V(4).Error(err, "ping failed")
 					c.exit()
 					return
 				}

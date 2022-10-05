@@ -40,17 +40,16 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 		p2p.ClearTraceList()
 	}
 
-	globals.Logger = globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
+	Logger := globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
+	globals.SetGlobalsLogger(&Logger)
 
-	logger = globals.Logger.WithName("derod")
+	ControllerMainLogger(&Logger)
+	blockchain.SetBlockchainLogger(&Logger)
 
-	p2p_logger := globals.Logger.WithName("P2P")
-	p2p.ControllerSetLogger(&p2p_logger)
-	p2p.ConnectionSetLogger(&p2p_logger)
+	p2p_logger := Logger.WithName("P2P")
 	p2p.SetLogger(&p2p_logger, "")
-
-	core_logger := globals.Logger.WithName("CORE")
-	blockchain.SetLogger(&core_logger)
+	p2p.SetConnectionLogger(&p2p_logger)
+	p2p.SetPeerLogger(&p2p_logger)
 
 	logger.V(1).Info("Debug (ENABLED)")
 

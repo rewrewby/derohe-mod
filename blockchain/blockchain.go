@@ -114,8 +114,11 @@ var logger logr.Logger = logr.Discard() // default discard all logs
    Global parameters are picked up  from the config package
 */
 
-func SetLogger(newlogger *logr.Logger) {
-	logger = *newlogger
+func SetBlockchainLogger(newlogger *logr.Logger) {
+
+	mylogger := *newlogger
+	logger = mylogger.WithName("CORE")
+
 }
 
 func Blockchain_Start(params map[string]interface{}) (*Blockchain, error) {
@@ -892,9 +895,9 @@ func (chain *Blockchain) Add_Complete_Block(cbl *block.Complete_Block) (err erro
 	if height > chain.Get_Height() || height == 0 { // exception for genesis block
 		//atomic.StoreInt64(&chain.Height, height)
 		height_changed = true
-		block_logger.Info("Chain extended", "new height", height)
+		block_logger.V(1).Info("Chain extended", "new height", height)
 	} else {
-		block_logger.Info("Chain extended but height is same", "new height", height)
+		block_logger.V(1).Info("Chain extended but height is same", "new height", height)
 		chain_extended_lock.Lock()
 		SameHeightChainExtended[height]++
 		chain_extended_lock.Unlock()

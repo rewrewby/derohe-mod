@@ -100,6 +100,13 @@ var Exit_In_Progress = make(chan bool)
 
 var logger logr.Logger
 
+func ControllerMainLogger(newlogger *logr.Logger) {
+
+	mylogger := *newlogger
+	logger = mylogger.WithName("derod")
+
+}
+
 func save_config_file() {
 
 	config_file := filepath.Join(globals.GetDataDirectory(), "config.json")

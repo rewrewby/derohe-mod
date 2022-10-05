@@ -33,7 +33,7 @@ func IsTrustedIP(Addr string) bool {
 		}
 	}
 
-	logger.V(1).Info(fmt.Sprintf("%s is not a trusted node", Address))
+	// logger.V(1).Info(fmt.Sprintf("%s is not a trusted node", Address))
 
 	return false
 }

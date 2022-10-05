@@ -57,10 +57,10 @@ var Exit_Event = make(chan bool) // causes all threads to exit
 var Exit_In_Progress bool        // marks we are doing exit
 var logger logr.Logger           // global logger, every logger in this package is a child of this
 
-func ControllerSetLogger(newlogger *logr.Logger) {
+func SetPeerLogger(newlogger *logr.Logger) {
 
-	logger = *newlogger
-
+	mylogger := *newlogger
+	logger = mylogger
 }
 
 var sync_node bool // whether sync mode is activated
@@ -335,7 +335,7 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 	}
 
 	if shouldwebackoff(ip) {
-		local_logger.V(1).Info("backing off from this connection", "ip", remote_ip.String())
+		local_logger.V(4).Info("backing off from this connection", "ip", remote_ip.String())
 		return
 	} else {
 		backoff_mutex.Lock()

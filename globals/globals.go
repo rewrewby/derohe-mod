@@ -57,6 +57,13 @@ var Config config.CHAIN_CONFIG = config.Mainnet // default is mainnnet
 // global logger all components will use it with context
 var Logger logr.Logger = logr.Discard() // default discard all logs
 
+func SetGlobalsLogger(newlogger *logr.Logger) {
+
+	mylogger := *newlogger
+	Logger = mylogger
+
+}
+
 var ClockOffset time.Duration    // actual clock offset that is used by the daemon
 var ClockOffsetNTP time.Duration // clockoffset in reference to ntp servers
 var ClockOffsetP2P time.Duration // clockoffset in reference to p2p averging
