@@ -16,9 +16,12 @@
 
 package p2p
 
-import "fmt"
-import "strings"
-import "github.com/deroproject/derohe/cryptography/crypto"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/deroproject/derohe/cryptography/crypto"
+)
 
 // This file defines the structure for the protocol which is CBOR ( which is standard) stream multiplexed using yamux
 // stream multiplexing allows us have bidirection RPC using net/rpc
@@ -58,6 +61,7 @@ type Handshake_Struct struct {
 	PeerList        []Peer_Info   `cbor:"PLIST"`
 	Extension_List  []string      `cbor:"EXT"`
 	Request         bool          `cbor:"REQUEST"` //whether this is a request
+	Hansen33Mod     bool          `cbor:"MODDED"`
 }
 
 type Peer_Info struct {

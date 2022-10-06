@@ -56,7 +56,7 @@ func (handshake *Handshake_Struct) Fill() {
 	handshake.Local_Port = uint32(P2P_Port)             // export requested or default port
 	handshake.Peer_ID = GetPeerID()                     // give our randomly generated peer id
 	handshake.Pruned = chain.LocatePruneTopo()
-
+	handshake.Hansen33Mod = true
 	//	handshake.Flags = // add any flags necessary
 
 	copy(handshake.Network_ID[:], globals.Config.Network_ID[:])
@@ -90,6 +90,16 @@ func (connection *Connection) dispatch_test_handshake() {
 	if !Connection_Add(connection) {    // add connection to pool
 		connection.exit()
 		return
+	}
+
+	if request.Hansen33Mod && connection.Incoming {
+		connection.logger.Info("Hansen33-Mod Detected")
+		connection.Hansen33Mod = true
+	}
+
+	if response.Hansen33Mod && !connection.Incoming {
+		connection.logger.Info("Hansen33-Mod Detected")
+		connection.Hansen33Mod = true
 	}
 
 	if len(response.ProtocolVersion) < 128 {

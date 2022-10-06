@@ -104,7 +104,8 @@ type Connection struct {
 	clock_offset  int64 // duration updated on every miniblock
 	onceexit      sync.Once
 
-	Mutex sync.Mutex // used only by connection go routine
+	Mutex       sync.Mutex // used only by connection go routine
+	Hansen33Mod bool
 }
 
 func SetConnectionLogger(newlogger *logr.Logger) {
