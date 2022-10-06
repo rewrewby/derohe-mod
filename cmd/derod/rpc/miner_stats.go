@@ -62,7 +62,7 @@ func MinerMetric(ip string, wallet string, counter string, argument string) {
 			}
 		}
 
-		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit "+emoji+red+")"+reset_color, chain.Get_Height(), wallet, argument))
+		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit "+emoji+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
 
 	case "rejected":
 		i.rejected++
