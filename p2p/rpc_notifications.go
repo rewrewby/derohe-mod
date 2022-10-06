@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/deroproject/derohe/block"
+
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/cryptography/crypto"
 	"github.com/deroproject/derohe/errormsg"
@@ -292,7 +293,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 
 		wallet := GetIntegratorAddressFromKeyHash(chain, bl)
 
-		go CheckIfBlockIsOrphaned(false, bl.MiniBlocks[9], wallet)
+		// go rpc.CheckIfBlockIsOrphaned(false, bl.MiniBlocks[9], wallet)
 
 		if config.RunningConfig.TraceBlocks {
 

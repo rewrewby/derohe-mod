@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strconv"
 	"time"
 
 	"bytes"
@@ -143,116 +142,11 @@ func CountMiners() int {
 	return miners_count
 }
 
-var CountUniqueMiners int64
-
-var CountMinisAccepted int64 // total accepted which passed Powtest, chain may still ignore them
-var CountMinisRejected int64 // total rejected // note we are only counting rejected as those which didnot pass Pow test
-var CountBlocks int64        //  total blocks found as integrator, note that block can still be a orphan
-
-// total = CountAccepted + CountRejected + CountBlocks(they may be orphan or may not get rewarded)
-
-type inner_miner_stats struct {
-	blocks     uint64
-	miniblocks uint64
-	rejected   uint64
-	orphaned   uint64
-	// hashrate   float64
-	lasterr     string
-	miners      int64
-	feesoverdue bool
-	feeaddress  string
-}
-
-var miner_stats_mutex sync.Mutex
-var miner_stats = make(map[string]inner_miner_stats)
-
 var green string = "\033[32m"      // default is green color
 var yellow string = "\033[33m"     // make prompt yellow
 var red string = "\033[31m"        // make prompt red
 var blue string = "\033[34m"       // blue color
 var reset_color string = "\033[0m" // reset color
-
-func getMinerStats(wallet string) (stats inner_miner_stats) {
-
-	miner_stats_mutex.Lock()
-	defer miner_stats_mutex.Unlock()
-
-	stats = miner_stats[wallet]
-
-	return stats
-}
-
-func IncreaseMinerCount(ip string, wallet string, counter string, argument string) {
-
-	miner_stats_mutex.Lock()
-	defer miner_stats_mutex.Unlock()
-
-	i := miner_stats[wallet]
-
-	if counter == "newminer" {
-		i.miners++
-	}
-
-	if counter == "byeminer" {
-		i.miners--
-	}
-
-	if counter == "blocks" {
-		i.blocks++
-		logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height(), wallet))
-	}
-
-	if counter == "miniblocks" {
-		i.miniblocks++
-
-		emoji := "🏆"
-		text_color := green
-		if s, err := strconv.ParseInt(argument, 10, 64); err == nil {
-			if s > 9 {
-				emoji = "😅"
-				text_color = yellow
-			}
-		}
-
-		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit "+emoji+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
-	}
-
-	if counter == "rejected" {
-		i.rejected++
-	}
-
-	if counter == "orphaned" {
-		i.orphaned++
-	}
-
-	if counter == "lasterror" {
-		i.lasterr = argument
-	}
-
-	if counter == "feeisdue" {
-		i.feesoverdue = true
-		i.feeaddress = argument
-		logger.Info(fmt.Sprintf("Fee is due for %s", wallet))
-		i.lasterr = "! Cheater !"
-
-	}
-	if counter == "feeispaid" {
-		i.feesoverdue = false
-		i.blocks++
-		i.lasterr = argument
-	}
-
-	miner_stats[wallet] = i
-
-	// count unique miners
-	count := 0
-	for _, stat := range miner_stats {
-		if stat.miners >= 1 {
-			count++
-		}
-	}
-	CountUniqueMiners = int64(count)
-}
 
 func ShowMinerInfo(wallet string) {
 
@@ -319,9 +213,7 @@ func ShowMinerInfo(wallet string) {
 
 func ListMiners() {
 
-	// Aggregate miner stats per wallet
-	miner_stats_mutex.Lock()
-	defer miner_stats_mutex.Unlock()
+	miner_stats := GetAllMinerStats()
 
 	fmt.Print("Connected Miners\n\n")
 
@@ -597,7 +489,7 @@ func newUpgrader() *websocket.Upgrader {
 		if err != nil {
 			//logger.Info("Submitting block could not be decoded")
 			sess.lasterr = fmt.Sprintf("Submitted block could not be decoded. err: %s", err)
-			go IncreaseMinerCount(miner, sess.address.String(), "lasterror", sess.lasterr)
+			go MinerMetric(miner, sess.address.String(), "lasterror", sess.lasterr)
 			return
 		}
 
@@ -629,11 +521,11 @@ func newUpgrader() *websocket.Upgrader {
 
 				if !blid.IsZero() || integrator_address_hashed_key == miner_hash {
 					logger.Info(fmt.Sprintf("Cheater (%s) has paid his due(s)", sess.address.String()))
-					go IncreaseMinerCount(miner, sess.address.String(), "feeispaid", "Cheater has Paid!")
+					go MinerMetric(miner, sess.address.String(), "feeispaid", "Cheater has Paid!")
 					sess.blocks++
 				} else {
 					logger.Info(fmt.Sprintf("Minted block for own (%s) vs. (%s) and is still cheating! Anti Cheat not working!", integrator_address_hashed_key, miner_hash))
-					go IncreaseMinerCount(miner, sess.address.String(), "feeispaid", "No match for block!")
+					go MinerMetric(miner, sess.address.String(), "feeispaid", "No match for block!")
 				}
 
 			}
@@ -641,10 +533,10 @@ func newUpgrader() *websocket.Upgrader {
 			//logger.Infof("Submitted block %s accepted", blid)
 			if blid.IsZero() {
 				sess.miniblocks++
-				atomic.AddInt64(&CountMinisAccepted, 1)
+				atomic.AddInt64(&globals.CountMinisAccepted, 1)
 				globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
-				go IncreaseMinerCount(miner, sess.address.String(), "miniblocks", fmt.Sprintf("%d", globals.MiniBlocksCollectionCount))
-				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
+				go MinerMetric(miner, sess.address.String(), "miniblocks", fmt.Sprintf("%d", globals.MiniBlocksCollectionCount))
+				go CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
 				rate_lock.Lock()
@@ -664,19 +556,19 @@ func newUpgrader() *websocket.Upgrader {
 						c.Close()
 						delete(client_list, c)
 						logger_getwork.V(1).Info("Banned miner", "Address", miner, "Info", "Banned")
-						go IncreaseMinerCount(miner, sess.address.String(), "lasterror", "Banned miner")
+						go MinerMetric(miner, sess.address.String(), "lasterror", "Banned miner")
 
 					}
 				}
 
 			} else {
 				sess.blocks++
-				atomic.AddInt64(&CountBlocks, 1)
+				atomic.AddInt64(&globals.CountBlocksAccepted, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
-				go p2p.CheckIfBlockIsOrphaned(true, mbl, sess.address.String())
+				go CheckIfBlockIsOrphaned(true, mbl, sess.address.String())
 
-				go IncreaseMinerCount(miner, sess.address.String(), "blocks", "")
+				go MinerMetric(miner, sess.address.String(), "blocks", "")
 
 			}
 
@@ -688,7 +580,7 @@ func newUpgrader() *websocket.Upgrader {
 
 				if miner_stat.miniblocks > 19 && cheat_ratio <= 5 {
 
-					go IncreaseMinerCount(miner, sess.address.String(), "feeisdue", chain.IntegratorAddress().String())
+					go MinerMetric(miner, sess.address.String(), "feeisdue", chain.IntegratorAddress().String())
 
 					logger.V(1).Info(fmt.Sprintf("Cheater (%s) - marking session for repacking", sess.address.String()))
 				}
@@ -698,13 +590,13 @@ func newUpgrader() *websocket.Upgrader {
 
 		if !sresult || err != nil {
 			sess.rejected++
-			atomic.AddInt64(&CountMinisRejected, 1)
+			atomic.AddInt64(&globals.CountMinisRejected, 1)
 
-			go IncreaseMinerCount(miner, sess.address.String(), "rejected", "")
+			go MinerMetric(miner, sess.address.String(), "rejected", "")
 
 			if err != nil {
 				sess.lasterr = err.Error()
-				go IncreaseMinerCount(miner, sess.address.String(), "lasterror", sess.lasterr)
+				go MinerMetric(miner, sess.address.String(), "lasterror", sess.lasterr)
 			}
 
 			// Increase fail count and ban miner in case of 3 invalid PoW's in a row
@@ -718,7 +610,7 @@ func newUpgrader() *websocket.Upgrader {
 
 				delete(client_list, c)
 				logger_getwork.V(1).Info("Banned miner", "Address", miner, "Info", "Banned")
-				go IncreaseMinerCount(miner, sess.address.String(), "lasterror", "Banned miner")
+				go MinerMetric(miner, sess.address.String(), "lasterror", "Banned miner")
 			}
 			ban_list[miner] = i
 
@@ -728,7 +620,7 @@ func newUpgrader() *websocket.Upgrader {
 	u.OnClose(func(c *websocket.Conn, err error) {
 
 		sess := c.Session().(*user_session)
-		go IncreaseMinerCount(ParseIPNoError(c.RemoteAddr().String()), sess.address.String(), "byeminer", "")
+		go MinerMetric(ParseIPNoError(c.RemoteAddr().String()), sess.address.String(), "byeminer", "")
 		go DeleteMinerHashrate(c.RemoteAddr().String())
 		client_list_mutex.Lock()
 		defer client_list_mutex.Unlock()
@@ -784,7 +676,7 @@ func onWebsocket(w http.ResponseWriter, r *http.Request) {
 	session := user_session{address: *addr, address_sum: graviton.Sum(addr_raw)}
 	wsConn.SetSession(&session)
 
-	go IncreaseMinerCount(ParseIPNoError(conn.RemoteAddr().String()), session.address.String(), "newminer", "")
+	go MinerMetric(ParseIPNoError(conn.RemoteAddr().String()), session.address.String(), "newminer", "")
 
 	client_list_mutex.Lock()
 	defer client_list_mutex.Unlock()

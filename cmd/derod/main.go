@@ -390,7 +390,7 @@ func main() {
 	miner_count := derodrpc.CountMiners()
 
 	total_orphans := p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
-	my_orphan_blocks_count := globals.CountMiniOrphan + globals.CountOrphan
+	my_orphan_blocks_count := globals.CountOrphanBlocks + globals.CountOrphanMinis
 
 	network_loss := float64(0)
 	blockcount := config.RunningConfig.NetworkStatsKeepCount * 10
@@ -427,7 +427,7 @@ func main() {
 				miniblock_count = chain.MiniBlocks.Count()
 				miner_count = derodrpc.CountMiners()
 				total_orphans = p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
-				my_orphan_blocks_count = globals.CountMiniOrphan + globals.CountOrphan
+				my_orphan_blocks_count = globals.CountOrphanBlocks + globals.CountOrphanMinis
 
 				network_loss = float64(0)
 				blockcount = config.RunningConfig.NetworkStatsKeepCount * 10
@@ -493,8 +493,8 @@ func main() {
 
 				menu_string := testnet_string + fmt.Sprintf(" %d/%d (%.1f%%) %s|%s|%s", globals.MiniBlocksCollectionCount, miniblock_count, network_loss, globals.GetOffset().Round(time.Millisecond).String(), globals.GetOffsetNTP().Round(time.Millisecond).String(), globals.GetOffsetP2P().Round(time.Millisecond).String())
 
-				good_blocks := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
-				unique_miner_count := derodrpc.CountUniqueMiners
+				good_blocks := (globals.CountMinisAccepted + globals.CountBlocksAccepted)
+				unique_miner_count := globals.CountUniqueMiners
 
 				l.SetPrompt(fmt.Sprintf("\033[1m\033[32mDERO HE (\033[31m%s-mod\033[32m):%s \033[0m"+color+"%d/%d [%d/%d] "+pcolor+"P %d/%d TXp %d:%d \033[32mNW %s >MN %d/%d [%d/%d] %s>>\033[0m ",
 					config.RunningConfig.OperatorName, turtle_string, our_height, topo_height, best_height, best_topo_height, peer_whitelist, peer_count, mempool_tx_count,
@@ -1097,7 +1097,7 @@ restart_loop:
 			fmt.Printf("\tPeer ID:"+yellow+" %d\n"+reset_color, p2p.GetPeerID())
 			fmt.Printf("\tNode Tag:"+yellow+" %s\n"+reset_color, p2p.GetNodeTag())
 
-			blocksMinted := (derodrpc.CountMinisAccepted + derodrpc.CountBlocks)
+			blocksMinted := (globals.CountMinisAccepted + globals.CountBlocksAccepted)
 			fmt.Print("\n" + blue + "Mining Stats:\n" + reset_color)
 			fmt.Printf("\t"+blue+"Block Minted: "+green+"%d "+blue+"(MB+IB)"+reset_color+"\n", blocksMinted)
 			if blocksMinted > 0 {
@@ -1119,7 +1119,7 @@ restart_loop:
 			}
 
 			OrphanBlockRate := float64(0)
-			my_orphan_blocks_count := globals.CountMiniOrphan + globals.CountOrphan
+			my_orphan_blocks_count := globals.CountOrphanMinis + globals.CountOrphanBlocks
 			if my_orphan_blocks_count > 0 {
 				OrphanBlockRate = float64(float64(float64(my_orphan_blocks_count)/float64(blocksMinted)) * 100)
 			}
@@ -1137,17 +1137,17 @@ restart_loop:
 			mbo_color := green
 			mbr_color := green
 
-			if globals.CountOrphan >= 1 {
+			if globals.CountOrphanBlocks >= 1 {
 				ibo_color = red
 			}
-			if globals.CountMiniOrphan >= 1 {
+			if globals.CountOrphanMinis >= 1 {
 				mbo_color = red
 			}
-			if derodrpc.CountMinisRejected >= 1 {
+			if globals.CountMinisRejected >= 1 {
 				mbr_color = red
 			}
 
-			fmt.Printf("\t"+blue+"IB:"+green+"%d "+blue+"MB:"+green+"%d "+blue+"IBO:"+ibo_color+"%d "+blue+"MBO:"+mbo_color+"%d "+blue+"MBR:"+mbr_color+"%d"+reset_color+"\n", derodrpc.CountBlocks, derodrpc.CountMinisAccepted, globals.CountOrphan, globals.CountMiniOrphan, derodrpc.CountMinisRejected)
+			fmt.Printf("\t"+blue+"IB:"+green+"%d "+blue+"MB:"+green+"%d "+blue+"IBO:"+ibo_color+"%d "+blue+"MBO:"+mbo_color+"%d "+blue+"MBR:"+mbr_color+"%d"+reset_color+"\n", globals.CountBlocksAccepted, globals.CountMinisAccepted, globals.CountOrphanBlocks, globals.CountOrphanMinis, globals.CountMinisRejected)
 			fmt.Printf("\t"+blue+"MB "+green+"%.02f%%"+blue+"(1hr)\t"+green+"%.05f%%"+blue+"(1d)\t"+green+"%.06f%%"+blue+"(7d)\t(Moving average %%, will be 0 if no miniblock found)"+reset_color+"\n", derodrpc.HashrateEstimatePercent_1hr(), derodrpc.HashrateEstimatePercent_1day(), derodrpc.HashrateEstimatePercent_7day())
 			mh_1hr := uint64((float64(chain.Get_Network_HashRate()) * derodrpc.HashrateEstimatePercent_1hr()) / 100)
 			mh_1d := uint64((float64(chain.Get_Network_HashRate()) * derodrpc.HashrateEstimatePercent_1day()) / 100)

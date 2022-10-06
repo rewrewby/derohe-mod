@@ -42,6 +42,13 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// Colors
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
+
 // all the the global variables used by the program are stored here
 // since the entire logic is designed around a state machine driven by external events
 // once the core starts nothing changes until there is a network state change
@@ -85,10 +92,6 @@ var blockingProfile = pprof.Lookup("block")
 var goProfile = pprof.Lookup("goroutine")
 
 var MiniBlocksCollectionCount uint8
-
-var CountMiniOrphan int64
-var CountOrphan int64
-var CountTotalBlocks int64
 
 var NodeMaintenance bool = false
 var MaintenanceStart int64 = time.Now().Unix()
@@ -455,3 +458,17 @@ func ParseAmount(str string) (amount uint64, err error) {
 func StackTrace(all bool) string {
 	return string(debug.Stack())
 }
+
+// Solo Below
+
+var CountUniqueMiners int64
+var CountBlocksAccepted int64
+var CountOrphanBlocks int64
+
+var CountMinisAccepted int64 // total accepted which passed Powtest, chain may still ignore them
+var CountOrphanMinis int64
+
+var CountMinisRejected int64 // total rejected // note we are only counting rejected as those which didnot pass Pow test
+
+// Network Wide - My total blocks are CountBlocks+CountMinisAccepted
+var CountTotalBlocks int64
