@@ -536,7 +536,7 @@ func newUpgrader() *websocket.Upgrader {
 				atomic.AddInt64(&globals.CountMinisAccepted, 1)
 				globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
 				go MinerMetric(miner, sess.address.String(), "miniblocks", fmt.Sprintf("%d", globals.MiniBlocksCollectionCount))
-				go CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
+				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
 				rate_lock.Lock()
@@ -566,7 +566,7 @@ func newUpgrader() *websocket.Upgrader {
 				atomic.AddInt64(&globals.CountBlocksAccepted, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
 
-				go CheckIfBlockIsOrphaned(true, mbl, sess.address.String())
+				go p2p.CheckIfBlockIsOrphaned(true, mbl, sess.address.String())
 
 				go MinerMetric(miner, sess.address.String(), "blocks", "")
 

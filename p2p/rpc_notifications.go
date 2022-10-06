@@ -293,7 +293,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 
 		wallet := GetIntegratorAddressFromKeyHash(chain, bl)
 
-		// go rpc.CheckIfBlockIsOrphaned(false, bl.MiniBlocks[9], wallet)
+		CheckIfBlockIsOrphaned(false, bl.MiniBlocks[9], wallet)
 
 		if config.RunningConfig.TraceBlocks {
 
