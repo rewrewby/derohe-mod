@@ -125,8 +125,17 @@ func (connection *Connection) dispatch_test_handshake() {
 		Peer_Add(&p)
 	}
 
-	// parse delivered peer list as grey list
-	connection.logger.V(4).Info("Peer provides peers", "count", len(response.PeerList))
+	if len(response.PeerList) >= 1 {
+		if IsTrustedIP(connection.Addr.String()) {
+			connection.logger.V(2).Info("Trusted Peer provides peers in dispatch_test_handshake", "count", len(response.PeerList))
+			connection.logger.V(3).Info("Trusted Peer provides peers in dispatch_test_handshake", "peers", response.PeerList)
+		} else {
+			connection.logger.V(2).Info("Peer provides peers in dispatch_test_handshake", "count", len(response.PeerList))
+			connection.logger.V(3).Info("Peer provides peers in dispatch_test_handshake", "peers", response.PeerList)
+		}
+	}
+
+	// connection.logger.V(4).Info("Peer provides peers", "count", len(response.PeerList))
 	for i := range response.PeerList {
 		if i < 13 {
 			go Peer_Add(&Peer{Address: response.PeerList[i].Addr, LastConnected: uint64(time.Now().UTC().Unix())})
@@ -165,6 +174,13 @@ func (c *Connection) Handshake(request Handshake_Struct, response *Handshake_Str
 
 	c.update(&request.Common) // update common information
 	if c.State == ACTIVE {
+		if IsTrustedIP(c.Addr.String()) {
+			c.logger.V(2).Info("Peer provides peers in handshake", "count", len(request.PeerList))
+			c.logger.V(3).Info("Peer provides peers in handshake", "peers", request.PeerList)
+		} else {
+			c.logger.V(2).Info("Trusted Peer provides peers in handshake", "count", len(request.PeerList))
+			c.logger.V(3).Info("Trusted Peer provides peers in handshake", "peers", request.PeerList)
+		}
 		for i := range request.PeerList {
 			if i < 31 {
 				go Peer_Add(&Peer{Address: request.PeerList[i].Addr, LastConnected: uint64(time.Now().UTC().Unix())})
