@@ -92,28 +92,28 @@ func (connection *Connection) dispatch_test_handshake() {
 		return
 	}
 
-	if len(request.Flags) >= 1 {
+	if len(request.Flags) >= 1 && connection.Incoming {
 
 		connection.logger.V(1).Info(fmt.Sprintf("Peer has flags: %s", request.Flags))
 		connection.logger.V(2).Info("incoming REQ", "request", request)
 	}
-	if len(response.Flags) >= 1 {
+	if len(response.Flags) >= 1 && !connection.Incoming {
 		connection.logger.V(1).Info(fmt.Sprintf("Peer has flags: %s", request.Flags))
 		connection.logger.V(2).Info("outgoing RES", "response", response)
 	}
 
-	// if request.Hansen33Mod && connection.Incoming {
-	// 	connection.logger.V(1).Info("Hansen33-Mod Detected")
-	// 	connection.Hansen33Mod = true
-	// 	connection.logger.V(2).Info("incoming REQ", "request", request)
+	if request.Hansen33Mod && connection.Incoming {
+		connection.logger.V(1).Info("Hansen33-Mod Detected")
+		connection.Hansen33Mod = true
+		connection.logger.V(2).Info("incoming REQ", "request", request)
 
-	// }
+	}
 
-	// if response.Hansen33Mod && !connection.Incoming {
-	// 	connection.logger.V(1).Info("Hansen33-Mod Detected")
-	// 	connection.logger.V(2).Info("outgoing RES", "response", response)
-	// 	connection.Hansen33Mod = true
-	// }
+	if response.Hansen33Mod && !connection.Incoming {
+		connection.logger.V(1).Info("Hansen33-Mod Detected")
+		connection.logger.V(2).Info("outgoing RES", "response", response)
+		connection.Hansen33Mod = true
+	}
 
 	if len(response.ProtocolVersion) < 128 {
 		connection.ProtocolVersion = response.ProtocolVersion
