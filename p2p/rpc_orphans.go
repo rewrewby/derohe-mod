@@ -55,8 +55,9 @@ func CheckIfMiniBlockIsOrphaned(local bool, mblData block.MiniBlock, miner strin
 			if local {
 				atomic.AddInt64(&globals.CountOrphanMinis, 1)
 				go AddBlockToMyOrphanMiniBlockCollection(mblData, miner)
+			} else {
+				go AddBlockToOrphanMiniBlockCollection(mblData, miner)
 			}
-			go AddBlockToOrphanMiniBlockCollection(mblData, miner)
 
 			return
 		}
