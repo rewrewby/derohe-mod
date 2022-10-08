@@ -323,6 +323,15 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 
 	ip := ParseIPNoError(remote_ip.String())
 
+	if shouldwebackoff(ip) {
+		local_logger.V(4).Info("backing off from this connection", "ip", remote_ip.String())
+		return
+	} else {
+		backoff_mutex.Lock()
+		backoff[ip] = time.Now().Unix() + 10
+		backoff_mutex.Unlock()
+	}
+
 	if IsAddressInBanList(ip) {
 		local_logger.V(2).Info("Connecting to banned IP is prohibited", "IP", remote_ip.IP.String())
 		return
@@ -332,15 +341,6 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 	if IsAddressConnected(ip) {
 		local_logger.V(4).Info("outgoing address is already connected", "ip", remote_ip.String())
 		return //nil, fmt.Errorf("Already connected")
-	}
-
-	if shouldwebackoff(ip) {
-		local_logger.V(4).Info("backing off from this connection", "ip", remote_ip.String())
-		return
-	} else {
-		backoff_mutex.Lock()
-		backoff[ip] = time.Now().Unix() + 10
-		backoff_mutex.Unlock()
 	}
 
 	var masterkey = pbkdf2.Key(globals.Config.Network_ID.Bytes(), globals.Config.Network_ID.Bytes(), 1024, 32, sha1.New)
