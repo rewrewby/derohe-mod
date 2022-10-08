@@ -106,8 +106,9 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.MiniBlock, miner string)
 				atomic.AddInt64(&globals.CountOrphanBlocks, 1)
 				// Update Miner
 				go AddBlockToMyOrphanBlockCollection(blockData, miner)
+			} else {
+				go AddBlockToOrphanBlockCollection(blockData, miner)
 			}
-			go AddBlockToOrphanBlockCollection(blockData, miner)
 
 			return
 		}
