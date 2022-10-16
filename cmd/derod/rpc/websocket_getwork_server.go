@@ -534,7 +534,9 @@ func newUpgrader() *websocket.Upgrader {
 			if blid.IsZero() {
 				sess.miniblocks++
 				atomic.AddInt64(&globals.CountMinisAccepted, 1)
+				chain.MiniBlocks.RLock()
 				globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+				chain.MiniBlocks.RUnlock()
 				go MinerMetric(miner, sess.address.String(), "miniblocks", fmt.Sprintf("%d", globals.MiniBlocksCollectionCount))
 				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)

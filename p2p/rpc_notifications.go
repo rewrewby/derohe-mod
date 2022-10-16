@@ -210,7 +210,9 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			return err
 		} else { // rebroadcast miniblock
 
+			chain.MiniBlocks.RLock()
 			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+			chain.MiniBlocks.RUnlock()
 
 			atomic.AddInt64(&globals.CountTotalBlocks, 1)
 			wallet := GetMinerAddressFromKeyHash(chain, mbl)

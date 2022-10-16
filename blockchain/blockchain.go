@@ -1236,7 +1236,7 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 					return fmt.Errorf("address already registered")
 				} else { // add  to regpool
 					if chain.Regpool.Regpool_Add_TX(tx, 0) {
-						go LogTx(tx)
+						go LogTx(tx, chain.Get_Height())
 						return nil
 					} else {
 						return fmt.Errorf("registration for address is already pending")
@@ -1332,7 +1332,7 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 
 	if chain.Mempool.Mempool_Add_TX(tx, 0) { // new tx come with 0 marker
 		//rlog.Tracef(2, "Successfully added tx %s to pool", txhash)
-		go LogTx(tx)
+		go LogTx(tx, chain.Get_Height())
 		return nil
 	} else {
 		//rlog.Tracef(2, "TX %s rejected by pool by mempool", txhash)
@@ -1341,10 +1341,10 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 
 }
 
-func LogTx(tx *transaction.Transaction) {
+func LogTx(tx *transaction.Transaction, height int64) {
 	if config.RunningConfig.TraceTx {
 
-		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", tx.Height)
+		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", height)
 		txt_text := fmt.Sprintf(blue+"TXID"+reset_color+": "+blue+"%s"+reset_color+"", tx.GetHash())
 		type_text := red + "** UN-IDENTIFIED TX **"
 
