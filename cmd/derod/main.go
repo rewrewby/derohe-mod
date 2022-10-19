@@ -1681,6 +1681,14 @@ restart_loop:
 					}
 				}
 
+				if line_parts[1] == "variable_dispatch" {
+					if config.RunningConfig.VariableDispatchTime {
+						config.RunningConfig.VariableDispatchTime = false
+					} else {
+						config.RunningConfig.VariableDispatchTime = true
+					}
+				}
+
 				if line_parts[1] == "maintenance" {
 					if len(line_parts) == 3 {
 						config.RunningConfig.MinerMaintenanceMessage = line_parts[2]
@@ -1764,6 +1772,11 @@ restart_loop:
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "P2P BW Factor", config.RunningConfig.P2PBWFactor, "config p2p_bwfactor <num>"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "GETWORK - Job will be dispatch time", config.RunningConfig.GETWorkJobDispatchTime, "config job_dispatch_time <miliseconds>"))
+			variable_dispatch := "OFF"
+			if config.RunningConfig.VariableDispatchTime {
+				variable_dispatch = "ON"
+			}
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "GETWORK - Variable Dispatch Time", variable_dispatch, "config variable_dispatch"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Peer Log Expiry (sec)", config.RunningConfig.ErrorLogExpirySeconds, "config peer_log_expiry <seconds>"))
 

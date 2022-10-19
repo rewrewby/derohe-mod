@@ -293,6 +293,7 @@ func SendJob() {
 	// get a block template, and then we will fill the address here as optimization
 	bl, mbl_main, _, _, err := chain.Create_new_block_template_mining(chain.IntegratorAddress())
 	if err != nil {
+		logger.Error(err, "Failed to create template")
 		return
 	}
 
@@ -756,9 +757,27 @@ func Getwork_server() {
 		old_height := int64(0)
 		for {
 			if miners_count > 0 {
+
+				dispatch_time := config.RunningConfig.GETWorkJobDispatchTime
 				current_mini_count := chain.MiniBlocks.Count()
 				current_height := chain.Get_Height()
-				if old_mini_count != current_mini_count || old_height != current_height || time.Now().Sub(old_time) > config.RunningConfig.GETWorkJobDispatchTime {
+
+				if config.RunningConfig.VariableDispatchTime {
+
+					delay := int64(900)
+
+					if current_mini_count > 0 && current_mini_count < 8 {
+						delay = 900 - (100 * int64(current_mini_count))
+					}
+
+					if current_mini_count >= 8 {
+						delay = 50
+					}
+
+					dispatch_time = time.Duration(delay * int64(time.Millisecond))
+				}
+
+				if old_mini_count != current_mini_count || old_height != current_height || time.Now().Sub(old_time) > dispatch_time {
 					old_mini_count = current_mini_count
 					old_height = current_height
 					SendJob()

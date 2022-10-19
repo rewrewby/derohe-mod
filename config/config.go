@@ -161,6 +161,7 @@ type RUN_CONFIG struct {
 	TraceBlocks             bool
 	TraceTx                 bool
 	MinerMaintenanceMessage string
+	VariableDispatchTime    bool
 }
 
 var RunningConfig = RUN_CONFIG{
@@ -173,6 +174,7 @@ var RunningConfig = RUN_CONFIG{
 	BlockRejectThreshold:    80,
 	PeerLatencyThreshold:    time.Duration(2000 * time.Millisecond),
 	GETWorkJobDispatchTime:  time.Duration(500 * time.Millisecond),
+	VariableDispatchTime:    false,
 	OnlyTrusted:             false,
 	ErrorLogExpirySeconds:   600,
 	Min_Peers:               200,
