@@ -352,7 +352,11 @@ func SendJob() {
 				params.Blockhashing_blob = fmt.Sprintf("%x", mbl.Serialize())
 
 			} else {
-				params.LastError = "Node is currently booting..."
+				if globals.CountTotalBlocks > 0 {
+					params.LastError = fmt.Sprintf("Node is ready in (%d) ...", 10-globals.CountTotalBlocks)
+				} else {
+					params.LastError = "Node is currently booting, mining will resume shortly ..."
+				}
 			}
 
 			if !v.valid_address && !chain.IsAddressHashValid(false, v.address_sum) {
