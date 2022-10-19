@@ -390,8 +390,9 @@ func SendJob() {
 var hashrate_lock sync.Mutex
 
 type MinersHashrate struct {
-	hashrate float64
-	wallet   string
+	hashrate  float64
+	wallet    string
+	submitted int64
 }
 
 var MinerHashrateMap = make(map[string]MinersHashrate)
@@ -405,6 +406,13 @@ func DeleteMinerHashrate(connection string) {
 
 	delete(MinerHashrateMap, connection)
 
+	// check for old expired submitted ones
+	for key, stat := range MinerHashrateMap {
+		if stat.submitted+19 <= time.Now().Unix() {
+			delete(MinerHashrateMap, key)
+		}
+	}
+
 }
 
 func SubmitMinerHashrate(connection string, miner string, hashrate float64) {
@@ -417,6 +425,8 @@ func SubmitMinerHashrate(connection string, miner string, hashrate float64) {
 	x := MinerHashrateMap[connection]
 	x.hashrate = hashrate
 	x.wallet = miner
+	x.submitted = time.Now().Unix()
+
 	MinerHashrateMap[connection] = x
 
 }
