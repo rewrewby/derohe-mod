@@ -108,13 +108,6 @@ type Connection struct {
 	Hansen33Mod bool
 }
 
-func SetConnectionLogger(newlogger *logr.Logger) {
-
-	mylogger := *newlogger
-	logger = mylogger
-
-}
-
 func ConnecToNode(address string) {
 
 	go connect_with_endpoint(address, false)

@@ -57,12 +57,6 @@ var Exit_Event = make(chan bool) // causes all threads to exit
 var Exit_In_Progress bool        // marks we are doing exit
 var logger logr.Logger           // global logger, every logger in this package is a child of this
 
-func SetPeerLogger(newlogger *logr.Logger) {
-
-	mylogger := *newlogger
-	logger = mylogger
-}
-
 var sync_node bool // whether sync mode is activated
 
 var nonbanlist []string // any ips in this list will never be banned
@@ -309,22 +303,16 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 
 	defer globals.Recover(2)
 
-	local_logger := logger
-
-	if IsPeerTraced(endpoint) {
-		local_logger = peer_logger
-	}
-
 	remote_ip, err := net.ResolveUDPAddr("udp", endpoint)
 	if err != nil {
-		local_logger.V(3).Error(err, "Resolve address failed:", "endpoint", endpoint)
+		logger.V(3).Error(err, "Resolve address failed:", "endpoint", endpoint)
 		return
 	}
 
 	ip := ParseIPNoError(remote_ip.String())
 
 	if shouldwebackoff(ip) {
-		local_logger.V(4).Info("backing off from this connection", "ip", remote_ip.String())
+		logger.V(4).Info("backing off from this connection", "ip", remote_ip.String())
 		return
 	} else {
 		backoff_mutex.Lock()
@@ -333,13 +321,13 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 	}
 
 	if IsAddressInBanList(ip) {
-		local_logger.V(2).Info("Connecting to banned IP is prohibited", "IP", remote_ip.IP.String())
+		logger.V(2).Info("Connecting to banned IP is prohibited", "IP", remote_ip.IP.String())
 		return
 	}
 
 	// check whether are already connected to this address if yes, return
 	if IsAddressConnected(ip) {
-		local_logger.V(4).Info("outgoing address is already connected", "ip", remote_ip.String())
+		logger.V(4).Info("outgoing address is already connected", "ip", remote_ip.String())
 		return //nil, fmt.Errorf("Already connected")
 	}
 
@@ -548,8 +536,7 @@ func P2P_Server_v2() {
 		connection.logger = new_logger
 
 		if IsPeerTraced(remote_addr.String()) {
-			logger.Info("Traced Peer - Reconnects")
-			connection.logger = peer_logger.WithName(remote_addr.String())
+			connection.logger.Info("Traced Peer - Reconnects")
 		}
 
 		in, out := Peer_Direction_Count()

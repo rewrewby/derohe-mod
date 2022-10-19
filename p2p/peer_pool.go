@@ -33,7 +33,6 @@ import (
 
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
-	"github.com/go-logr/logr"
 )
 
 //import "encoding/binary"
@@ -265,39 +264,6 @@ func Peer_Add(p *Peer) {
 	} else {
 		// logger.Infof("Peer adding to list")
 		peer_map[ParseIPNoError(p.Address)] = p
-	}
-
-}
-
-var peer_logger logr.Logger
-
-func SetLogger(newlogger *logr.Logger, Address string) {
-
-	peer_mutex.Lock()
-	defer peer_mutex.Unlock()
-
-	mylogger := *newlogger
-	Address = ParseIPNoError(Address)
-
-	for i := 0; i <= 3; i++ {
-
-		connection_map.Range(func(k, value interface{}) bool {
-			c := value.(*Connection)
-
-			ip := ParseIPNoError(c.Addr.String())
-			if len(Address) >= 7 && ip != Address {
-				return true
-			}
-
-			peer_logger := mylogger.WithName(c.Addr.String())
-			c.logger = peer_logger
-			connection_map.Store(k, c)
-
-			if len(Address) >= 7 && ip == Address {
-				c.logger.Info("PEER Tracing Started")
-			}
-			return true
-		})
 	}
 
 }

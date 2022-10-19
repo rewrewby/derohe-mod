@@ -100,13 +100,6 @@ var Exit_In_Progress = make(chan bool)
 
 var logger logr.Logger
 
-func ControllerMainLogger(newlogger *logr.Logger) {
-
-	mylogger := *newlogger
-	logger = mylogger.WithName("derod")
-
-}
-
 func save_config_file() {
 
 	config_file := filepath.Join(globals.GetDataDirectory(), "config.json")
@@ -1175,24 +1168,6 @@ restart_loop:
 
 			}
 
-		case command == "debug_peer":
-
-			log_level := int8(5)
-			if len(line_parts) >= 2 {
-
-				if len(line_parts) == 3 {
-					i, err := strconv.ParseInt(line_parts[2], 10, 64)
-					if err != nil {
-						io.WriteString(l.Stderr(), "usage: debug <ip> [log level]\n")
-					} else {
-						log_level = int8(i)
-					}
-				}
-				DebugPeer(l, line_parts[1], log_level)
-			} else {
-				io.WriteString(l.Stderr(), "usage: debug <ip> [log level]\n")
-			}
-
 		case command == "debug":
 
 			log_level := config.RunningConfig.LogLevel
@@ -2167,7 +2142,6 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mrun_diagnostics\033[0m\t\tRun Diagnostics Checks\n")
 	io.WriteString(w, "\t\033[1muptime\033[0m\t\tDisplay Daemon Uptime Info\n")
 	io.WriteString(w, "\t\033[1mdebug\033[0m\t\tToggle debug ON/OFF\n")
-	io.WriteString(w, "\t\033[1mdebug_peer\033[0m\tChange log level only for single peer connect - debug_peerl <ip> [log level - default 5]\n")
 	io.WriteString(w, "\t\033[1mpeer_list (modified)\033[0m\tPrint peer list\n")
 	io.WriteString(w, "\t\033[1msyncinfo (modified)\033[0m\tPrint more peer list\n")
 	io.WriteString(w, "\t\033[1mpeer_info\033[0m\tPrint peer information. To see details use - peer_info <ip>\n")

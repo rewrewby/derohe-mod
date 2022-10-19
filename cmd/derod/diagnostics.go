@@ -17,14 +17,6 @@ import (
 
 var DiagnosticInterval uint64 = 1
 
-func DebugPeer(l *readline.Instance, Address string, log_level int8) {
-
-	Address = p2p.ParseIPNoError(Address)
-
-	globals.SetLogLevel(l, log_level)
-
-}
-
 func ToggleDebug(l *readline.Instance, log_level int8) {
 
 	if config.RunningConfig.LogLevel == log_level && log_level != 0 {
@@ -37,16 +29,7 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 		p2p.ClearTraceList()
 	}
 
-	Logger := globals.SetLogLevel(l.Stdout(), log_level)
-	globals.SetGlobalsLogger(&Logger)
-
-	ControllerMainLogger(&Logger)
-	blockchain.SetBlockchainLogger(&Logger)
-
-	p2p_logger := Logger.WithName("P2P")
-	p2p.SetLogger(&p2p_logger, "")
-	p2p.SetConnectionLogger(&p2p_logger)
-	p2p.SetPeerLogger(&p2p_logger)
+	globals.SetLogLevel(l.Stdout(), log_level)
 
 	if log_level >= 1 {
 		logger.V(1).Info("Debug (ENABLED)")

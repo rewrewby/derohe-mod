@@ -189,38 +189,13 @@ func (c *removeCallerCore) With(fields []zap.Field) zapcore.Core {
 	return &removeCallerCore{c.Core.With(fields)}
 }
 
-func SetLogLevel(console io.Writer, log_level int8) logr.Logger {
+func SetLogLevel(console io.Writer, log_level int8) {
 
 	if log_level > 127 {
 		log_level = 127
 	}
 
-	Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(0 - log_level))
-
-	if log_level == OriginalLogLevel {
-		Logger = LoggerOriginal
-	} else {
-
-		zc := zap.NewDevelopmentEncoderConfig()
-		zc.EncodeLevel = zapcore.CapitalColorLevelEncoder
-		zc.EncodeTime = zapcore.TimeEncoderOfLayout("02/01 15:04:05")
-
-		console_encoder := zapcore.NewConsoleEncoder(zc)
-
-		core_console := zapcore.NewCore(console_encoder, zapcore.AddSync(console), Log_Level_Console)
-		removecore := &removeCallerCore{core_console}
-		core := zapcore.NewTee(
-			removecore,
-		)
-
-		zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
-
-		newlogger := zapr.NewLogger(zcore) // sets up global logger
-		//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
-		Logger = newlogger
-	}
-
-	return Logger
+	Log_Level_Console.SetLevel(zapcore.Level(0 - log_level))
 }
 
 func InitializeLog(console, logfile io.Writer) {
@@ -282,6 +257,7 @@ func InitializeLog(console, logfile io.Writer) {
 	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
 
 	Console_Only_Logger = zapr.NewLogger(zcore_console)
+
 	// Console_Only_Logger = Logger
 	// remember -1 is debug, 0 is info
 
