@@ -1386,7 +1386,7 @@ func LogTx(tx *transaction.Transaction, height int64) {
 			ring_size = fmt.Sprintf(blue+"Ringsize "+yellow+"%d"+reset_color, int(tx.Payloads[0].Statement.RingSize))
 		}
 
-		logger.Info(fmt.Sprintf("%-31s %-30s %-35s %-35s %-30s %-90s"+reset_color, height_txt, type_text, size, amount, ring_size, txt_text))
+		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-30s %-35s %-35s %-30s %-90s"+reset_color, height_txt, type_text, size, amount, ring_size, txt_text))
 	}
 }
 

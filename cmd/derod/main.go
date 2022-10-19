@@ -220,14 +220,11 @@ func main() {
 
 	// parse arguments and setup logging , print basic information
 	exename, _ := os.Executable()
-
-	logfile = &lumberjack.Logger{
+	globals.InitializeLog(l.Stdout(), &lumberjack.Logger{
 		Filename:   exename + ".log",
 		MaxSize:    100, // megabytes
 		MaxBackups: 2,
-	}
-
-	globals.InitializeLog(l.Stdout(), logfile)
+	})
 
 	logger = globals.Logger.WithName("derod")
 
@@ -360,12 +357,12 @@ func main() {
 	globals.Cron.AddFunc("@every 10s", p2p.UpdateLiveBlockData)
 	// This tiny goroutine continuously updates status as required
 
-	go func() {
-		for {
-			time.Sleep(1 * time.Minute)
-			RunDiagnosticCheckSquence(chain, l)
-		}
-	}()
+	// go func() {
+	// 	for {
+	// 		time.Sleep(1 * time.Minute)
+	// 		RunDiagnosticCheckSquence(chain, l)
+	// 	}
+	// }()
 
 	last_our_height := int64(0)
 	last_best_height := int64(0)

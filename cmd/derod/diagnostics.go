@@ -21,10 +21,7 @@ func DebugPeer(l *readline.Instance, Address string, log_level int8) {
 
 	Address = p2p.ParseIPNoError(Address)
 
-	peer_log := globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
-
-	p2p.SetLogger(&peer_log, Address)
-	p2p.AddPeerTraceList(Address)
+	globals.SetLogLevel(l, log_level)
 
 }
 
@@ -34,13 +31,13 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 		return
 	}
 
-	if config.RunningConfig.LogLevel > 0 {
+	if log_level > 0 {
 		logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
 	} else {
 		p2p.ClearTraceList()
 	}
 
-	Logger := globals.SetLogLevel(l.Stdout(), logfile, (0 - int(log_level)))
+	Logger := globals.SetLogLevel(l.Stdout(), log_level)
 	globals.SetGlobalsLogger(&Logger)
 
 	ControllerMainLogger(&Logger)
@@ -51,7 +48,9 @@ func ToggleDebug(l *readline.Instance, log_level int8) {
 	p2p.SetConnectionLogger(&p2p_logger)
 	p2p.SetPeerLogger(&p2p_logger)
 
-	logger.V(1).Info("Debug (ENABLED)")
+	if log_level >= 1 {
+		logger.V(1).Info("Debug (ENABLED)")
+	}
 
 	config.RunningConfig.LogLevel = log_level
 

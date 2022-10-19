@@ -229,7 +229,7 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 				wallet_color := blue
 
 				// check if wallet is local and make green
-				logger.Info(fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+" - "+wallet_color+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%d:9]", mbl.Height, wallet, globals.MiniBlocksCollectionCount))
+				globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+" - "+wallet_color+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%d:9]", mbl.Height, wallet, globals.MiniBlocksCollectionCount))
 			}
 
 			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
@@ -308,7 +308,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 
 			last_height = bl.Height
 
-			logger.Info(fmt.Sprintf(text_color+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+text_color+"Successfully found DERO integrator block", last_height, wallet))
+			globals.Console_Only_Logger.Info(fmt.Sprintf(text_color+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+text_color+"Successfully found DERO integrator block", last_height, wallet))
 
 		}
 

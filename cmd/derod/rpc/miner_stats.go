@@ -43,7 +43,7 @@ func MinerMetric(ip string, wallet string, counter string, argument string) {
 
 	case "blocks":
 		i.blocks++
-		logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height(), wallet))
+		globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height(), wallet))
 
 	case "miniblocks":
 		i.miniblocks++
@@ -57,7 +57,7 @@ func MinerMetric(ip string, wallet string, counter string, argument string) {
 			}
 		}
 
-		logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit "+emoji+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
+		globals.Console_Only_Logger.Info(fmt.Sprintf(yellow+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%s:9]\t"+red+"("+blue+"going to submit "+emoji+red+")"+reset_color, chain.Get_Height()+1, wallet, argument))
 
 	case "rejected":
 		i.rejected++

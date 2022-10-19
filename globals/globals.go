@@ -62,7 +62,10 @@ var BlockChainStartHeight int64
 var Config config.CHAIN_CONFIG = config.Mainnet // default is mainnnet
 
 // global logger all components will use it with context
-var Logger logr.Logger = logr.Discard() // default discard all logs
+var Logger logr.Logger = logr.Discard()         // default discard all logs
+var LoggerOriginal logr.Logger = logr.Discard() // default discard all logs
+var OriginalLogLevel int8
+var Console_Only_Logger logr.Logger = logr.Discard() // default discard all logs
 
 func SetGlobalsLogger(newlogger *logr.Logger) {
 
@@ -186,38 +189,44 @@ func (c *removeCallerCore) With(fields []zap.Field) zapcore.Core {
 	return &removeCallerCore{c.Core.With(fields)}
 }
 
-func SetLogLevel(console, logfile io.Writer, log_level int) logr.Logger {
+func SetLogLevel(console io.Writer, log_level int8) logr.Logger {
 
-	Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(log_level))
+	if log_level > 127 {
+		log_level = 127
+	}
 
-	zf := zap.NewDevelopmentEncoderConfig()
-	zc := zap.NewDevelopmentEncoderConfig()
-	zc.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	zc.EncodeTime = zapcore.TimeEncoderOfLayout("02/01 15:04:05")
+	Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(0 - log_level))
 
-	file_encoder := zapcore.NewJSONEncoder(zf)
-	console_encoder := zapcore.NewConsoleEncoder(zc)
+	if log_level == OriginalLogLevel {
+		Logger = LoggerOriginal
+	} else {
 
-	core_console := zapcore.NewCore(console_encoder, zapcore.AddSync(console), Log_Level_Console)
-	removecore := &removeCallerCore{core_console}
-	core := zapcore.NewTee(
-		removecore,
-		zapcore.NewCore(file_encoder, zapcore.AddSync(logfile), Log_Level_File),
-	)
+		zc := zap.NewDevelopmentEncoderConfig()
+		zc.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		zc.EncodeTime = zapcore.TimeEncoderOfLayout("02/01 15:04:05")
 
-	zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
+		console_encoder := zapcore.NewConsoleEncoder(zc)
 
-	newlogger := zapr.NewLogger(zcore) // sets up global logger
-	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
-	Logger = newlogger
-	return newlogger
+		core_console := zapcore.NewCore(console_encoder, zapcore.AddSync(console), Log_Level_Console)
+		removecore := &removeCallerCore{core_console}
+		core := zapcore.NewTee(
+			removecore,
+		)
+
+		zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
+
+		newlogger := zapr.NewLogger(zcore) // sets up global logger
+		//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
+		Logger = newlogger
+	}
+
+	return Logger
 }
 
 func InitializeLog(console, logfile io.Writer) {
 
 	if Arguments["--debug"] != nil && Arguments["--debug"].(bool) == true { // setup debug mode if requested
 		Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(-1))
-		config.RunningConfig.LogLevel = 1
 	}
 
 	if Arguments["--clog-level"] != nil { // setup log level if requested
@@ -229,8 +238,8 @@ func InitializeLog(console, logfile io.Writer) {
 		if log_level > 127 {
 			log_level = 127
 		}
-		config.RunningConfig.LogLevel = log_level
 		Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(0 - log_level))
+		OriginalLogLevel = log_level
 	}
 
 	if Arguments["--flog-level"] != nil { // setup log level if requested
@@ -260,14 +269,24 @@ func InitializeLog(console, logfile io.Writer) {
 		zapcore.NewCore(file_encoder, zapcore.AddSync(logfile), Log_Level_File),
 	)
 
+	core_console_log := zapcore.NewTee(
+		removecore,
+	)
+
 	zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
 
+	zcore_console := zap.New(core_console_log, zap.AddCaller())
+
 	Logger = zapr.NewLogger(zcore) // sets up global logger
+	LoggerOriginal = Logger
 	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
 
+	Console_Only_Logger = zapr.NewLogger(zcore_console)
+	// Console_Only_Logger = Logger
 	// remember -1 is debug, 0 is info
 
 }
+
 func Initialize() {
 	var err error
 

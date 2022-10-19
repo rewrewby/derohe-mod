@@ -602,7 +602,7 @@ func mineblock(tid int) {
 
 				if CheckPowHashBig(powhash, &diff) == true { // note we are doing a local, NW might have moved meanwhile
 
-					logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
+					globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
 
 					go func() {
 						defer globals.Recover(1)
@@ -624,7 +624,7 @@ func mineblock(tid int) {
 
 				if CheckPowHashBig(powhash, &diff) == true { // note we are doing a local, NW might have moved meanwhile
 
-					logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
+					globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
 
 					go func() {
 						defer globals.Recover(1)
