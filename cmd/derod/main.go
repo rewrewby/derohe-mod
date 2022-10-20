@@ -1645,6 +1645,14 @@ restart_loop:
 					}
 				}
 
+				if line_parts[1] == "track_tagged" {
+					if config.RunningConfig.TraceTagged {
+						config.RunningConfig.TraceTagged = false
+					} else {
+						config.RunningConfig.TraceTagged = true
+					}
+				}
+
 				if line_parts[1] == "p2p_turbo" {
 					if config.RunningConfig.P2PTurbo {
 						config.RunningConfig.P2PTurbo = false

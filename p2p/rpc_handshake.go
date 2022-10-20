@@ -92,6 +92,14 @@ func (connection *Connection) dispatch_test_handshake() {
 		return
 	}
 
+	if len(response.Tag) >= 1 && config.RunningConfig.TraceTagged {
+
+		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+		host_string := fmt.Sprintf(green+"%s - "+yellow+"%s "+red+"   [ "+blue+"Connected "+red+"]"+reset_color, response.Tag, connection.Addr.String())
+
+		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-80s"+reset_color, height_txt, host_string))
+	}
+
 	if len(response.ProtocolVersion) < 128 {
 		connection.ProtocolVersion = response.ProtocolVersion
 	}
