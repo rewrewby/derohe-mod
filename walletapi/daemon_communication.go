@@ -122,7 +122,7 @@ var Daemon_Endpoint_Active string
 func get_daemon_address() string {
 	if globals.Arguments["--remote"] == true && globals.IsMainnet() {
 		// Daemon_Endpoint_Active = config.REMOTE_DAEMON + fmt.Sprintf(":%d", config.Mainnet.RPC_Default_Port)
-		Daemon_Endpoint_Active = "https://dero-node.mysrv.cloud"
+		Daemon_Endpoint_Active = "https://dero-api.mysrv.cloud"
 	}
 
 	// if user provided endpoint has error, use default

@@ -91,7 +91,7 @@ ONE CPU, ONE VOTE.
 http://wiki.dero.io
 
 Usage:
-  dero-miner  --wallet-address=<wallet_address> [--daemon-rpc-address=<dero-node.mysrv.cloud:10100>] [--mining-threads=<threads>] [--testnet] [--debug] [--tag=<tag>] [--output-to-file] [--text-mode] 
+  dero-miner  --wallet-address=<wallet_address> [--daemon-rpc-address=<dero-api.mysrv.cloud:10100>] [--mining-threads=<threads>] [--testnet] [--debug] [--tag=<tag>] [--output-to-file] [--text-mode] 
   dero-miner --bench 
   dero-miner -h | --help
   dero-miner --version
@@ -100,13 +100,13 @@ Options:
   -h --help     Show this screen.
   --version     Show version.
   --bench  	    Run benchmark mode.
-  --daemon-rpc-address=<127.0.0.1:10102>    Miner will connect to daemon RPC on this port (default dero-node.mysrv.cloud:10100).
+  --daemon-rpc-address=<127.0.0.1:10102>    Miner will connect to daemon RPC on this port (default dero-api.mysrv.cloud:10100).
   --wallet-address=<wallet_address>    		This address is rewarded when a block is mined sucessfully.
   --mining-threads=<threads>         		Number of CPU threads for mining [default: ` + fmt.Sprintf("%d", runtime.GOMAXPROCS(0)) + `]
   --tag=<tag>								Set Miner Tag (Hansen33 Mod Feature).
   --output-stats-to-file 								Used for HiveOS custom_miner stats file.
 
-Example Mainnet: ./dero-miner-linux-amd64 --wallet-address dero1qy0ehnqjpr0wxqnknyc66du2fsxyktppkr8m8e6jvplp954klfjz2qqhmy4zf --daemon-rpc-address=dero-node.mysrv.cloud:10100
+Example Mainnet: ./dero-miner-linux-amd64 --wallet-address dero1qy0ehnqjpr0wxqnknyc66du2fsxyktppkr8m8e6jvplp954klfjz2qqhmy4zf --daemon-rpc-address=dero-api.mysrv.cloud:10100
 Example Testnet: ./dero-miner-linux-amd64 --wallet-address deto1qy0ehnqjpr0wxqnknyc66du2fsxyktppkr8m8e6jvplp954klfjz2qqdzcd8p --daemon-rpc-address=127.0.0.1:40402 
 If daemon running on local machine no requirement of '--daemon-rpc-address' argument. 
 `
