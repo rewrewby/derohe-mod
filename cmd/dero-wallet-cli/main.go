@@ -156,10 +156,17 @@ func main() {
 	l.Refresh() // refresh the prompt
 
 	// parse arguments and setup logging , print basic information
-	exename, _ := os.Executable()
-	f, err := os.Create(exename + ".log")
+	dirname, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Printf("Error while opening log file err: %s filename %s\n", err, exename+".log")
+		fmt.Print("Error: could not find user home directory ")
+
+	}
+
+	filename := dirname + "/" + os.Args[0] + ".log"
+
+	f, err := os.Create(filename)
+	if err != nil {
+		fmt.Printf("Error while opening log file %s (%s)\n", filename, err)
 		return
 	}
 	globals.InitializeLog(l.Stdout(), f)
