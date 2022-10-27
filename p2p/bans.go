@@ -211,7 +211,9 @@ func ParseAddress(address string) (ipnet *net.IPNet, result string, err error) {
 }
 
 // check whether an IP is in the map already
-//  we should loop and search in subnets also
+//
+//	we should loop and search in subnets also
+//
 // TODO make it fast, however we are not expecting millions of bans, so this may be okay for time being
 func IsAddressInBanList(address string) bool {
 	ban_mutex.Lock()
