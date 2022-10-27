@@ -20,10 +20,12 @@ If you don't alredy know DERO - Check out [Dero git repo](https://github.com/der
 
 ### Changes from official release includes (but not limited to)
 
- Many Mining and Network stats
- Live TX, Blocks, Orphans and Node Connectiviy Tracking
- Running Node Config Changes
- Change of debug level at run time
+* Many Mining and Network stats
+* Live TX, Blocks, Orphans and Node Connectiviy Tracking
+* Running Node Config Changes
+* Change of debug level at run time
+* Anti-Cheat Mining Feature
+* Many new command (check **help** and **config** command)
 
 ### Screen Shots
 
@@ -57,11 +59,12 @@ If you don't alredy know DERO - Check out [Dero git repo](https://github.com/der
  Only nodes used for mining will pay development fees.
  Avoid fees by modifying the source code or restart node every time you make a IB reward.
 
-### TODO
+## Installation
 
- * More Automation
- * More of the same
- * Send feature requests to hansen33#2541 on Discord
+
+
+
+* Send feature requests to hansen33#2541 on Discord
 
 
 

@@ -1081,7 +1081,15 @@ restart_loop:
 				network_loss = float64(float64(total_orphans)/float64(blockcount)) * 100
 			}
 
-			fmt.Printf(blue+"Network Orphan Mini Block Rate: "+red+"%d"+blue+"/"+green+"%d"+blue+" ("+red+"%.2f%%"+blue+")"+reset_color+"\n", total_orphans, blockcount, network_loss)
+			network_orphan_color := red
+			if network_loss < 3 {
+				network_orphan_color = yellow
+			}
+			if network_loss < 1.5 {
+				network_orphan_color = green
+			}
+
+			fmt.Printf(blue+"Network Orphan Mini Block Rate: "+network_orphan_color+"%.2f%%"+reset_color+"\n", network_loss)
 
 			fmt.Print(blue + "\nPeer Stats:\n" + reset_color)
 			fmt.Printf("\tPeer ID:"+yellow+" %d\n"+reset_color, p2p.GetPeerID())
@@ -1966,11 +1974,6 @@ restart_loop:
 				go p2p.ConnecToNode(ip)
 			}
 
-		case command == "connect_to_hansen":
-			go p2p.ConnecToNode("213.171.208.37:18089") // dero-node.mysrv.cloud
-			go p2p.ConnecToNode("74.208.211.24:11011")  // dero-node-us.mysrv.cloud
-			go p2p.ConnecToNode("77.68.102.85:11011")   // dero-playground.mysrv.cloud
-
 		case command == "bans":
 			p2p.BanList_Print() // print ban list
 
@@ -2132,7 +2135,6 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1madd_trusted\033[0m\tTrusted Peer - add_trusted <ip/tag>\n")
 	io.WriteString(w, "\t\033[1mremove_trusted\033[0m\tTrusted Peer - remove_trusted <ip/tag>\n")
 	io.WriteString(w, "\t\033[1mlist_trusted\033[0m\tShow Trusted Peer List\n")
-	io.WriteString(w, "\t\033[1mconnect_to_hansen\033[0m\tConnect to Hansen nodes\n")
 	io.WriteString(w, "\t\033[1mconnect_to_seeds\033[0m\tConnect to all seed nodes (see status in list_trusted)\n")
 	io.WriteString(w, "\t\033[1mconnect_to_peer\033[0m\tConnect to any peer using - connect_to_peer <ip:p2p-port>\n")
 	io.WriteString(w, "\t\033[1mdisconnect_peer\033[0m\tConnect to any peer using - disconnect_peer <ip>\n")
@@ -2177,13 +2179,10 @@ var completer = readline.NewPrefixCompleter(
 	readline.PcItem("clear_peer_stats"),
 	readline.PcItem("peer_info"),
 	readline.PcItem("debug"),
-	readline.PcItem("debug_peer"),
-	readline.PcItem("show_new_blocks"),
 	readline.PcItem("run_diagnostics"),
 	readline.PcItem("permban"),
 	readline.PcItem("config"),
 	readline.PcItem("ban_above_height"),
-	readline.PcItem("connect_to_hansen"),
 	readline.PcItem("add_trusted"),
 	readline.PcItem("remove_trusted"),
 	readline.PcItem("list_trusted"),
