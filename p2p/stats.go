@@ -93,6 +93,19 @@ func AddBlockToMyCollection(mbl block.MiniBlock, miner string) {
 	MyMiniBlocks[miner] = append(MyMiniBlocks[miner], mbl)
 }
 
+func GetMyBlocksCollection() map[string][]block.MiniBlock {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+
+	var CopyOfMyMiniBlocks = make(map[string][]block.MiniBlock)
+
+	for miner, _ := range MyMiniBlocks {
+		CopyOfMyMiniBlocks[miner] = append(CopyOfMyMiniBlocks[miner], MyMiniBlocks[miner]...)
+	}
+
+	return CopyOfMyMiniBlocks
+}
+
 var orphan_block_mutex sync.Mutex
 var OrphanHeightCount = make(map[uint64]int)
 var OrphanMiniBlocks = make(map[string][]block.MiniBlock)

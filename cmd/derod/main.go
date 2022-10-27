@@ -1412,60 +1412,31 @@ restart_loop:
 
 			derodrpc.ListMiners()
 
-		case command == "orphaned_blocks":
-
-			fmt.Print("Orphan Blocks List\n\n")
-
-			fmt.Printf("%-72s %-32s %-12s %s\n\n", "Wallet", "IP Address", "Height", "Block")
-
-			// MyOrphanBlocks := block.GetMyOrphansList()
-
-			count := 0
-			// for miner, _ := range MyOrphanBlocks {
-
-			// 	wallet := derodrpc.GetMinerWallet(miner)
-
-			// 	for _, height := range MyOrphanBlocks[miner] {
-			// 		hash, err := chain.Load_Block_Topological_order_at_index(int64(height))
-			// 		if err != nil {
-			// 			fmt.Printf("Skipping block at topo height %d due to error %s\n", height, err)
-
-			// 		} else {
-
-			// 			fmt.Printf("%-72s %-32s %-12d %s\n", wallet, miner, height, hash)
-			// 		}
-			// 		count++
-
-			// 	}
-			// }
-
-			fmt.Printf("Orphan Blocks Collection Size: %d\n", count)
-			fmt.Print("\n")
-
 		case command == "mined_blocks":
 
 			fmt.Print("Mined Blocks List\n\n")
 
-			fmt.Printf("%-72s %-32s %-12s %s\n\n", "Wallet", "IP Address", "Height", "Block")
+			fmt.Printf("%-72s %-12s %s\n\n", "Wallet", "Height", "Block")
 
+			blocks := p2p.GetMyBlocksCollection()
 			count := 0
-			// for miner, block_list := range block.MyBlocks {
+			for miner, block_list := range blocks {
 
-			// 	wallet := derodrpc.GetMinerWallet(miner)
+				// wallet := derodrpc.GetMinerWallet(miner)
 
-			// 	for _, mbl := range block_list {
-			// 		hash, err := chain.Load_Block_Topological_order_at_index(int64(mbl.Height))
-			// 		if err != nil {
-			// 			fmt.Printf("Skipping block at topo height %d - likely not committed yet\n", mbl.Height)
+				for _, mbl := range block_list {
+					hash, err := chain.Load_Block_Topological_order_at_index(int64(mbl.Height))
+					if err != nil {
+						fmt.Printf("Skipping block at topo height %d - likely not committed yet\n", mbl.Height)
 
-			// 		} else {
+					} else {
 
-			// 			fmt.Printf("%-72s %-32s %-12d %s\n", wallet, miner, mbl.Height, hash)
-			// 		}
-			// 		count++
-			// 	}
+						fmt.Printf("%-72s %-12d %s\n", miner, mbl.Height, hash)
+					}
+					count++
+				}
 
-			// }
+			}
 
 			fmt.Printf("Mined Blocks Collection Size: %d\n", count)
 			fmt.Print("\n")
@@ -2168,7 +2139,6 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mlist_miners\033[0m\tShow Connected Miners\n")
 	io.WriteString(w, "\t\033[1mminer_info\033[0m\tDetailed miner info - miner_info <wallet>\n")
 	io.WriteString(w, "\t\033[1mmined_blocks\033[0m\tList Mined Blocks\n")
-	io.WriteString(w, "\t\033[1morphaned_blocks\033[0m\tList Our Orphaned Blocks\n")
 	io.WriteString(w, "\t\033[1maddress_to_name\033[0m\tLookup registered names for Address\n")
 	io.WriteString(w, "\t\033[1mactive_miners\033[0m\tShow Active Miners on Network\n")
 	io.WriteString(w, "\t\033[1mactive_nodes\033[0m\tShow Active Mining Nodes\n")
@@ -2225,7 +2195,6 @@ var completer = readline.NewPrefixCompleter(
 	readline.PcItem("active_nodes"),
 	readline.PcItem("miner_info"),
 	readline.PcItem("mined_blocks"),
-	readline.PcItem("orphaned_blocks"),
 	readline.PcItem("address_to_name"),
 	readline.PcItem("show_selfish"),
 )
