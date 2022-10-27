@@ -560,6 +560,7 @@ func GetActiveMinersFromHeight(height int64) map[string]map[string]int {
 			stat["total"]++
 
 			if bl.IsOrphan {
+				stat["ibo"]++
 				stat["orphans"]++
 			}
 			ActiveMiners[bl.MinerWallet] = stat
@@ -578,6 +579,7 @@ func GetActiveMinersFromHeight(height int64) map[string]map[string]int {
 			stat["total"]++
 
 			if mbl.IsOrphan {
+				stat["mbo"]++
 				stat["orphans"]++
 			}
 

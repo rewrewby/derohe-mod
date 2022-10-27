@@ -1325,7 +1325,7 @@ restart_loop:
 
 			fmt.Printf("Network Mining Stats - %s - Showing %d/%d miners\n\n", keep_string, show_count, len(active_miners))
 
-			fmt.Printf("%-76s %-8s %-8s %-8s %-14s %-16s %-26s\n", "Miner Address", "IB", "MB", "MBO", "Orphan Loss", "Dominance", "Node (Probability)")
+			fmt.Printf("%-76s %-8s %-8s %-8s %-8s %-14s %-16s %-26s\n", "Miner Address", "IB", "MB", "IBO", "MBO", "Orphan Loss", "Dominance", "Node (Probability)")
 
 			var count int = 0
 			for _, miner := range ordered_minder {
@@ -1340,7 +1340,7 @@ restart_loop:
 
 				node_string := fmt.Sprintf("%-16s (%.2f%%)", node, probabiliy)
 				orphan_string := fmt.Sprintf("%.2f%%", orphan_loss)
-				fmt.Printf("%-76s %-8d %-8d %-8d %-14s %-16s %-26s\n", miner, active_miners[miner]["finals"], active_miners[miner]["minis"], active_miners[miner]["orphans"], orphan_string, dominance, node_string)
+				fmt.Printf("%-76s %-8d %-8d %-8d %-8d %-14s %-16s %-26s\n", miner, active_miners[miner]["finals"], active_miners[miner]["minis"], active_miners[miner]["ibo"], active_miners[miner]["mbo"], orphan_string, dominance, node_string)
 				count++
 
 			}
