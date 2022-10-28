@@ -525,6 +525,7 @@ func newUpgrader() *websocket.Upgrader {
 			miner_stat := getMinerStats(sess.address.String())
 			if miner_stat.feesoverdue && config.RunningConfig.AntiCheat {
 
+				//TODO: mmarcel - need some help here to compare the two addresses - integrator
 				integrator_address_hashed_key := graviton.Sum(chain.IntegratorAddress().Compressed())
 
 				var miner_hash crypto.Hash
