@@ -25,7 +25,6 @@ import (
 	"github.com/deroproject/derohe/block"
 	"github.com/deroproject/derohe/blockchain"
 	"github.com/deroproject/derohe/config"
-	"github.com/deroproject/derohe/cryptography/crypto"
 	"github.com/deroproject/derohe/globals"
 	"github.com/deroproject/derohe/p2p"
 	"github.com/deroproject/derohe/rpc"
@@ -525,21 +524,16 @@ func newUpgrader() *websocket.Upgrader {
 			miner_stat := getMinerStats(sess.address.String())
 			if miner_stat.feesoverdue && config.RunningConfig.AntiCheat {
 
-				//TODO: mmarcel - need some help here to compare the two addresses - integrator
-				integrator_address_hashed_key := graviton.Sum(chain.IntegratorAddress().Compressed())
-
-				var miner_hash crypto.Hash
-				copy(miner_hash[:], mbl.KeyHash[:])
+				wallet := GetMinerAddressFromKeyHash(chain, mbl)
 
 				logger.Info(fmt.Sprintf("Checking if Cheater (%s) has paid his due(s)", sess.address.String()))
 
-				if !blid.IsZero() || integrator_address_hashed_key == miner_hash {
+				if wallet == chain.IntegratorAddress().String() {
 					logger.Info(fmt.Sprintf("Cheater (%s) has paid his due(s)", sess.address.String()))
 					go MinerMetric(miner, sess.address.String(), "feeispaid", "Cheater has Paid!")
-					sess.blocks++
 				} else {
-					logger.Info(fmt.Sprintf("Minted block for own (%s) vs. (%s) and is still cheating! Anti Cheat not working!", integrator_address_hashed_key, miner_hash))
-					go MinerMetric(miner, sess.address.String(), "feeispaid", "No match for block!")
+					logger.Info(fmt.Sprintf("Minted block for own (%s) vs. (%s) and is still cheating! Anti Cheat not working!", wallet, chain.IntegratorAddress().String()))
+					go MinerMetric(miner, sess.address.String(), "feeispaid", "Super cheating!")
 				}
 
 			}
