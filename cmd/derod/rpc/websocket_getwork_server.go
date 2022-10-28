@@ -223,12 +223,11 @@ func ListMiners() {
 	for wallet, stat := range miner_stats {
 
 		miners_connected_str := fmt.Sprintf("%d", stat.miners)
-		// if stat.miners != stat.miners_connected {
-		// 	miners_connected_str = fmt.Sprintf("%d/%d", stat.miners_connected, stat.miners)
-		// }
+
+		orphan_count := uint64(p2p.GetMinerOrphanCount(wallet))
 
 		total_blocks := float64(stat.blocks + stat.miniblocks + stat.rejected)
-		bad_blocks := float64(stat.rejected + stat.orphaned)
+		bad_blocks := float64(stat.rejected + orphan_count)
 
 		success_rate := float64(100)
 
@@ -263,7 +262,7 @@ func ListMiners() {
 			is_connected = "yes"
 		}
 
-		fmt.Printf("%-72s %-10s %-12s %-12s %-12d %-12d %-12d %-12d %-14s %-12s\n", wallet, is_connected, miners_connected_str, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, p2p.GetMinerOrphanCount(wallet), success_rate_str, stat.lasterr)
+		fmt.Printf("%-72s %-10s %-12s %-12s %-12d %-12d %-12d %-12d %-14s %-12s\n", wallet, is_connected, miners_connected_str, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, orphan_count, success_rate_str, stat.lasterr)
 
 	}
 	hash_rate_string := "0 Hs"
