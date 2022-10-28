@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,10 +15,28 @@ import (
 	"github.com/deroproject/derohe/globals"
 )
 
-var trusted_map = map[string]int64{}
+var trusted_map = make(map[string]int64)
 var trust_mutex sync.Mutex
 
+func GetTrustedMap() map[string]int64 {
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
+
+	var mymap = make(map[string]int64)
+
+	for key, value := range trusted_map {
+		mymap[key] = value
+	}
+
+	return mymap
+
+}
+
 func IsTrustedIP(Addr string) bool {
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
 
 	Address := ParseIPNoError(Addr)
 
@@ -29,6 +48,17 @@ func IsTrustedIP(Addr string) bool {
 
 	for ip, _ := range trusted_map {
 		if Address == ParseIPNoError(ip) {
+			if Addr != ip {
+
+				_, _, err := net.SplitHostPort(Addr)
+				if err == nil {
+					logger.V(2).Info(fmt.Sprintf("Updating trusted map %s -> %s", ip, Addr))
+					trusted_map[Addr] = trusted_map[ip]
+					delete(trusted_map, ip)
+					// go save_trust_list()
+				}
+
+			}
 			return true
 		}
 	}
@@ -43,6 +73,9 @@ func LoadTrustedList() {
 
 	peer_mutex.Lock()
 	defer peer_mutex.Unlock()
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
 
 	peer_file := filepath.Join(globals.GetDataDirectory(), "trusted_peers.json")
 	if _, err := os.Stat(peer_file); errors.Is(err, os.ErrNotExist) {
@@ -69,10 +102,10 @@ func LoadTrustedList() {
 }
 
 //save peer list to disk
-func save_trust_list() {
+func SaveTrustList() {
 
-	peer_mutex.Lock()
-	defer peer_mutex.Unlock()
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
 
 	peer_file := filepath.Join(globals.GetDataDirectory(), "trusted_peers.json")
 	file, err := os.Create(peer_file)
@@ -91,29 +124,42 @@ func save_trust_list() {
 	}
 }
 
-func Add_Trusted(Address string) {
+func Add_Trusted(Addr string) {
 	trust_mutex.Lock()
 	defer trust_mutex.Unlock()
 
+	Address := ParseIPNoError(Addr)
+
+	if len(Address) < 1 {
+		return
+	}
+
+	found := false
 	for _, c := range UniqueConnections() {
 
 		ip := ParseIPNoError(c.Addr.String())
 
 		if ip == ParseIPNoError(Address) {
-			trusted_map[ip] = int64(time.Now().UTC().Unix())
+			trusted_map[c.Addr.String()] = int64(time.Now().UTC().Unix())
 			logger.Info(fmt.Sprintf("Address: %s (%s) - Added to Trusted List", ip, c.Tag))
-			go ConnecToNode(ip)
+			found = true
+			break
 		}
 
 		tag_match := regexp.MustCompile(Address)
 		if tag_match.Match([]byte(c.Tag)) {
-			trusted_map[ip] = int64(time.Now().UTC().Unix())
+			trusted_map[c.Addr.String()] = int64(time.Now().UTC().Unix())
 			logger.Info(fmt.Sprintf("Address: %s (%s) - Added to Trusted List", ip, c.Tag))
-			go ConnecToNode(ip)
+			found = true
+			break
 		}
 	}
 
-	go save_trust_list()
+	if !found {
+		trusted_map[Addr] = int64(time.Now().UTC().Unix())
+	}
+
+	go SaveTrustList()
 
 }
 
@@ -136,13 +182,10 @@ func Del_Trusted(Address string) {
 		}
 	}
 
-	go save_trust_list()
+	go SaveTrustList()
 }
 
 func Print_Trusted_Peers() {
-
-	trust_mutex.Lock()
-	defer trust_mutex.Unlock()
 
 	unique_map := UniqueConnections()
 	fmt.Printf("Trusted Peers\n\n")
@@ -173,12 +216,15 @@ func Print_Trusted_Peers() {
 	fmt.Printf("\n")
 
 	fmt.Printf("%-22s %-32s %-10s %-23s %-8s %-22s\n", "Address", "Added", "Connected", "Version", "Height", "Tag")
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
 	for Address, added := range trusted_map {
 
 		found := false
-
+		ip := ParseIPNoError(Address)
 		for _, conn := range unique_map {
-			if ParseIPNoError(conn.Addr.String()) == Address {
+			if ParseIPNoError(conn.Addr.String()) == ip {
 				found = true
 
 				version := conn.DaemonVersion
@@ -204,27 +250,9 @@ func Print_Trusted_Peers() {
 
 func Only_Trusted_Peers() {
 
-	trust_mutex.Lock()
-	defer trust_mutex.Unlock()
-
-	peer_mutex.Lock()
-	defer peer_mutex.Unlock()
-
 	unique_map := UniqueConnections()
-
 	for _, conn := range unique_map {
-
-		_, found := trusted_map[ParseIPNoError(conn.Addr.String())]
-
-		seed_found := false
-		for _, seed := range config.Mainnet_seed_nodes {
-			if ParseIPNoError(seed) == ParseIPNoError(conn.Addr.String()) {
-				seed_found = true
-			}
-
-		}
-
-		if !found && !seed_found {
+		if !conn.SyncNode && !IsTrustedIP(conn.Addr.String()) {
 			logger.V(1).Info(fmt.Sprintf("Disconnecting: %s", conn.Addr.String()))
 			conn.Client.Close()
 			conn.Conn.Close()
