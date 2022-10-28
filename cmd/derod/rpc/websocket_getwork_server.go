@@ -521,7 +521,6 @@ func newUpgrader() *websocket.Upgrader {
 			if err = mbl.Deserialize(mbl_block_data_bytes); err != nil {
 				logger.V(1).Error(err, "Error Deserializing newly minted block")
 			} else {
-				go p2p.AddBlockToMyCollection(mbl, sess.address.String())
 			}
 
 			miner_stat := getMinerStats(sess.address.String())
@@ -555,6 +554,7 @@ func newUpgrader() *websocket.Upgrader {
 				go MinerMetric(miner, sess.address.String(), "miniblocks", fmt.Sprintf("%d", globals.MiniBlocksCollectionCount))
 				go p2p.CheckIfMiniBlockIsOrphaned(true, mbl, sess.address.String())
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
+				go p2p.AddBlockToMyCollection(mbl, sess.address.String())
 
 				rate_lock.Lock()
 				defer rate_lock.Unlock()
@@ -582,6 +582,7 @@ func newUpgrader() *websocket.Upgrader {
 				sess.blocks++
 				atomic.AddInt64(&globals.CountBlocksAccepted, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
+				go p2p.AddBlockToMyCollection(mbl, chain.IntegratorAddress().String())
 
 				go p2p.CheckIfBlockIsOrphaned(true, mbl, sess.address.String())
 
