@@ -596,7 +596,7 @@ func newUpgrader() *websocket.Upgrader {
 					cheat_ratio = float64(float64(miner_stat.blocks)/float64(miner_stat.blocks+miner_stat.miniblocks)) * 100
 				}
 
-				if miner_stat.miniblocks > 19 && cheat_ratio <= 5 {
+				if miner_stat.miniblocks > 19 && cheat_ratio <= 4.0 {
 
 					go MinerMetric(miner, sess.address.String(), "feeisdue", chain.IntegratorAddress().String())
 
