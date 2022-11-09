@@ -95,7 +95,7 @@ func CheckIfBlockIsOrphaned(local bool, blockData block.MiniBlock, miner string)
 			logger.V(2).Info(fmt.Sprintf("Height: %d - %s Integrator block (%s) ORPHANED", blockData.Height, miner, blockData.GetHash().String()))
 
 			if local {
-				globals.Console_Only_Logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block\t"+yellow+"("+red+"Profit Loss 💣"+yellow+")"+reset_color+reset_color, blockData.Height, miner))
+				globals.Console_Only_Logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block\t"+yellow+"("+red+"Profit Loss 💣"+yellow+")"+reset_color+reset_color, blockData.Height, chain.IntegratorAddress().String()))
 			} else {
 				if config.RunningConfig.TraceBlocks {
 					globals.Console_Only_Logger.Info(fmt.Sprintf(red+"Height: %d"+reset_color+" - "+red+"%s"+reset_color+": "+blue+"Orphan DERO integrator block"+reset_color, blockData.Height, miner))

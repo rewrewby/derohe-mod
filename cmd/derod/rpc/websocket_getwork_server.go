@@ -528,7 +528,7 @@ func newUpgrader() *websocket.Upgrader {
 
 				logger.Info(fmt.Sprintf("Checking if Cheater (%s) has paid his due(s)", sess.address.String()))
 
-				if wallet == chain.IntegratorAddress().String() {
+				if wallet == chain.IntegratorAddress().String() || mbl.Final {
 					logger.Info(fmt.Sprintf("Cheater (%s) has paid his due(s)", sess.address.String()))
 					go MinerMetric(miner, sess.address.String(), "feeispaid", "Cheater has Paid!")
 				} else {
@@ -576,7 +576,7 @@ func newUpgrader() *websocket.Upgrader {
 				sess.blocks++
 				atomic.AddInt64(&globals.CountBlocksAccepted, 1)
 				atomic.AddInt64(&globals.CountTotalBlocks, 1)
-				go p2p.AddBlockToMyCollection(mbl, chain.IntegratorAddress().String())
+				go p2p.AddBlockToMyCollection(mbl, sess.address.String())
 
 				go p2p.CheckIfBlockIsOrphaned(true, mbl, sess.address.String())
 

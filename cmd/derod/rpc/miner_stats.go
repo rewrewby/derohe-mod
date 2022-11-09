@@ -43,7 +43,7 @@ func MinerMetric(ip string, wallet string, counter string, argument string) {
 
 	case "blocks":
 		i.blocks++
-		globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height(), wallet))
+		globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: %d"+reset_color+" - "+green+"%s"+reset_color+": "+green+"Successfully found DERO integrator block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, chain.Get_Height(), chain.IntegratorAddress().String()))
 
 	case "miniblocks":
 		i.miniblocks++
