@@ -139,6 +139,8 @@ func P2P_Init(params map[string]interface{}) error {
 	chain = params["chain"].(*blockchain.Blockchain)
 	load_ban_list()  // load ban list
 	load_peer_list() // load old list if availble
+	// load trusted peers
+	LoadTrustedList()
 
 	// if user provided a sync node, connect with it
 	if _, ok := globals.Arguments["--sync-node"]; ok { // check if parameter is supported
@@ -238,6 +240,12 @@ func P2P_engine() {
 		}
 	}
 
+	if _, ok := globals.Arguments["--add-exclusive-node"]; ok && len(globals.Arguments["--add-exclusive-node"].([]string)) == 0 { // check if parameter is supported
+
+		for trusted, _ := range GetTrustedMap() {
+			end_point_list = append(end_point_list, trusted)
+		}
+	}
 	//logger.Debugf("Priority list %+v", end_point_list)
 
 	// maintain connection to exclusive/priority nodes

@@ -295,9 +295,6 @@ func main() {
 		config.RunningConfig.GETWorkJobDispatchTime = time.Duration(i * int64(time.Millisecond))
 	}
 
-	// load trusted peers
-	p2p.LoadTrustedList()
-
 	go derodrpc.Getwork_server()
 
 	// setup function pointers

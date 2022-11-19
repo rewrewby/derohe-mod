@@ -95,10 +95,6 @@ func LoadTrustedList() {
 		}
 	}
 
-	for Address, _ := range trusted_map {
-		go ConnecToNode(Address)
-	}
-
 }
 
 //save peer list to disk
