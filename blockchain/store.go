@@ -352,6 +352,17 @@ func (chain *Blockchain) Load_Merkle_Hash(version uint64) (hash crypto.Hash, err
 // loads a complete block from disk
 func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Complete_Block, err error) {
 	cbl = &block.Complete_Block{}
+
+	// Memcached tuning
+	cache_id := fmt.Sprintf("CBL-%s", blid.String())
+	val, err := globals.Cache.Get(cache_id)
+	if err == nil {
+		if err = json.Unmarshal(val.Value, &cbl); err == nil {
+			// return cached result
+			return cbl, nil
+		}
+	}
+
 	cbl.Bl, err = chain.Load_BL_FROM_ID(blid)
 	if err != nil {
 		return
@@ -369,6 +380,10 @@ func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Compl
 			cbl.Txs = append(cbl.Txs, &tx)
 		}
 
+	}
+
+	if data, err := json.Marshal(cbl); err == nil {
+		globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
 	}
 
 	return
