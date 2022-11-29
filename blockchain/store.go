@@ -382,6 +382,7 @@ func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Compl
 
 	}
 
+	// memcached save
 	if data, err := json.Marshal(cbl); err == nil {
 		globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
 	}
