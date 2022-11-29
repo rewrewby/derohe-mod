@@ -345,9 +345,10 @@ func SendJob() {
 					}
 				}
 
-				for i := range mbl.Nonce { // give each user different work
-					mbl.Nonce[i] = globals.Global_Random.Uint32() // fill with randomness
-				}
+				// We already to this in - Create_new_block_template_mining ConvertBlockToMiniblock
+				// for i := range mbl.Nonce { // give each user different work
+				// 	mbl.Nonce[i] = globals.Global_Random.Uint32() // fill with randomness
+				// }
 				params.Blockhashing_blob = fmt.Sprintf("%x", mbl.Serialize())
 
 			} else {

@@ -18,10 +18,12 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"runtime/debug"
 	"time"
 
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/deroproject/derohe/blockchain"
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
@@ -36,6 +38,15 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 			err = fmt.Errorf("panic occured. stack trace %s", debug.Stack())
 		}
 	}()
+
+	id := "GetInfo-derod-response"
+	val, err := cache.Get(id)
+	if err == nil {
+		if err = json.Unmarshal(val.Value, &result); err == nil {
+			// return cached result
+			return result, nil
+		}
+	}
 
 	//result.Difficulty = chain.Get_Difficulty_At_Block(top_id)
 	result.Height = chain.Get_Height()
@@ -167,6 +178,15 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	result.HashrateEstimatePercent_1hr = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_1hr()) / 100)
 	result.HashrateEstimatePercent_1day = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_1day()) / 100)
 	result.HashrateEstimatePercent_7day = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_7day()) / 100)
+
+	if data, err := json.Marshal(result); err != nil {
+		logger.V(2).Error(err, "Error exporting data")
+	} else {
+		cacheErr := cache.Set(&memcache.Item{Key: id, Value: data, Expiration: 1})
+		if cacheErr != nil {
+			logger.V(2).Error(cacheErr, "Failed to cache object")
+		}
+	}
 
 	return result, nil
 }
