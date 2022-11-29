@@ -40,7 +40,7 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	}()
 
 	id := "GetInfo-derod-response"
-	val, err := cache.Get(id)
+	val, err := globals.Cache.Get(id)
 	if err == nil {
 		if err = json.Unmarshal(val.Value, &result); err == nil {
 			// return cached result
@@ -182,7 +182,7 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	if data, err := json.Marshal(result); err != nil {
 		logger.V(2).Error(err, "Error exporting data")
 	} else {
-		cacheErr := cache.Set(&memcache.Item{Key: id, Value: data, Expiration: 1})
+		cacheErr := globals.Cache.Set(&memcache.Item{Key: id, Value: data, Expiration: 1})
 		if cacheErr != nil {
 			logger.V(2).Error(cacheErr, "Failed to cache object")
 		}

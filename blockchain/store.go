@@ -16,17 +16,20 @@
 
 package blockchain
 
-import "fmt"
-import "math/big"
-import "path/filepath"
+import (
+	"encoding/json"
+	"fmt"
+	"math/big"
+	"path/filepath"
 
-import "github.com/deroproject/derohe/globals"
-import "github.com/deroproject/derohe/block"
-import "github.com/deroproject/derohe/config"
-import "github.com/deroproject/derohe/transaction"
-import "github.com/deroproject/derohe/cryptography/crypto"
-
-import "github.com/deroproject/graviton"
+	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/derohe/cryptography/crypto"
+	"github.com/deroproject/derohe/globals"
+	"github.com/deroproject/derohe/transaction"
+	"github.com/deroproject/graviton"
+)
 
 // though these can be done within a single DB, these are separated for completely clarity purposes
 type storage struct {
@@ -102,11 +105,25 @@ func (chain *Blockchain) StoreBlock(bl *block.Block, snapshot_version uint64) {
 func (chain *Blockchain) Load_BL_FROM_ID(hash [32]byte) (*block.Block, error) {
 	var bl block.Block
 
+	// Memcached tuning
+	cache_id := fmt.Sprintf("BL-HASH-ID-%x", hash)
+	val, err := globals.Cache.Get(cache_id)
+	if err == nil {
+		if err = json.Unmarshal(val.Value, &bl); err == nil {
+			// return cached result
+			return &bl, nil
+		}
+	}
+
 	if block_data, err := chain.Store.Block_tx_store.ReadBlock(hash); err == nil {
 
 		if err = bl.Deserialize(block_data); err != nil { // we should deserialize the block here
 			//logger.Warnf("fError deserialiing block, block id %x len(data) %d data %x err %s", hash[:], len(block_data), block_data, err)
 			return nil, err
+		}
+
+		if data, err := json.Marshal(bl); err == nil {
+			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
 		}
 
 		return &bl, nil
@@ -353,5 +370,6 @@ func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Compl
 		}
 
 	}
+
 	return
 }

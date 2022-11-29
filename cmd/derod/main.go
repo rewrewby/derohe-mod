@@ -235,6 +235,12 @@ func main() {
 	logger.V(0).Info("", "MODE", globals.Config.Name)
 	logger.V(0).Info("", "Daemon data directory", globals.GetDataDirectory())
 
+	cache_err := globals.Cache.Ping()
+	if cache_err == nil {
+		logger.Info("Memcached Enabled")
+	} else {
+		logger.Error(cache_err, "Memcached")
+	}
 	//go check_update_loop ()
 
 	params := map[string]interface{}{}

@@ -32,6 +32,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/rpc"
 	"github.com/go-logr/logr"
@@ -466,3 +467,5 @@ var CountMinisRejected int64 // total rejected // note we are only counting reje
 
 // Network Wide - My total blocks are CountBlocks+CountMinisAccepted
 var CountTotalBlocks int64
+
+var Cache = memcache.New("localhost:11211")

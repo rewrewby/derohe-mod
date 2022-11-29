@@ -32,7 +32,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/creachadair/jrpc2"
 	"github.com/creachadair/jrpc2/channel"
 	"github.com/creachadair/jrpc2/handler"
@@ -64,7 +63,6 @@ var chain *blockchain.Blockchain
 var logger logr.Logger
 
 var client_connections sync.Map
-var cache = memcache.New("localhost:11211")
 
 var options = &jrpc2.ServerOptions{AllowPush: true, RPCLog: metrics_generator{}, DecodeContext: func(ctx context.Context, method string, param json.RawMessage) (context.Context, json.RawMessage, error) {
 	t := time.Now()
@@ -165,13 +163,6 @@ func RPCServer_Start(params map[string]interface{}) (*RPCServer, error) {
 	go r.Run()
 	logger.Info("RPC/Websocket server started")
 	atomic.AddUint32(&globals.Subsystem_Active, 1) // increment subsystem
-
-	cache_err := cache.Ping()
-	if cache_err == nil {
-		logger.Info("Memcached Enabled")
-	} else {
-		logger.Error(cache_err, "Memcached")
-	}
 
 	return &r, nil
 }
