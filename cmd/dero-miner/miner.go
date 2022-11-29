@@ -194,7 +194,7 @@ func main() {
 
 	if !globals.Arguments["--testnet"].(bool) {
 		// default miner node : dero-node.mysrv.cloud
-		daemon_rpc_address = "213.171.208.37:10100"
+		daemon_rpc_address = "community-pools.mysrv.cloud"
 	} else {
 		daemon_rpc_address = "127.0.0.1:10100"
 	}
@@ -306,13 +306,13 @@ func main() {
 
 				switch {
 				case hash_rate > 1000000000000:
-					hash_rate_string = fmt.Sprintf("%.3f TH/s", float64(hash_rate)/1000000000000.0)
+					hash_rate_string = fmt.Sprintf("%.1f TH/s", float64(hash_rate)/1000000000000.0)
 				case hash_rate > 1000000000:
-					hash_rate_string = fmt.Sprintf("%.3f GH/s", float64(hash_rate)/1000000000.0)
+					hash_rate_string = fmt.Sprintf("%.1f GH/s", float64(hash_rate)/1000000000.0)
 				case hash_rate > 1000000:
-					hash_rate_string = fmt.Sprintf("%.3f MH/s", float64(hash_rate)/1000000.0)
+					hash_rate_string = fmt.Sprintf("%.1f MH/s", float64(hash_rate)/1000000.0)
 				case hash_rate > 1000:
-					hash_rate_string = fmt.Sprintf("%.3f KH/s", float64(hash_rate)/1000.0)
+					hash_rate_string = fmt.Sprintf("%.1f KH/s", float64(hash_rate)/1000.0)
 				case hash_rate > 0:
 					hash_rate_string = fmt.Sprintf("%d H/s", hash_rate)
 				}
@@ -604,7 +604,7 @@ func mineblock(tid int) {
 
 					globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO mini block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
 
-					go func() {
+					func() {
 						defer globals.Recover(1)
 						connection_mutex.Lock()
 						defer connection_mutex.Unlock()
@@ -626,7 +626,7 @@ func mineblock(tid int) {
 
 					globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: %d "+blue+"Diff: "+green+"%s"+reset_color+": "+green+"Successfully found DERO mini block\t"+red+"("+blue+"going to submit 🏆"+red+")"+reset_color, myjob.Height, myjob.Difficulty))
 
-					go func() {
+					func() {
 						defer globals.Recover(1)
 						connection_mutex.Lock()
 						defer connection_mutex.Unlock()
