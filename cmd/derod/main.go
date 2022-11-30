@@ -1664,6 +1664,19 @@ restart_loop:
 					}
 				}
 
+				if line_parts[1] == "memcached" {
+					if globals.MemcachedEnabled {
+						globals.MemcachedEnabled = false
+					} else {
+						cache_err := globals.Cache.Ping()
+						if cache_err == nil {
+							globals.MemcachedEnabled = true
+						} else {
+							logger.V(2).Error(cache_err, "Memcached")
+						}
+					}
+				}
+
 				if line_parts[1] == "p2p_turbo" {
 					if config.RunningConfig.P2PTurbo {
 						config.RunningConfig.P2PTurbo = false
@@ -1801,6 +1814,12 @@ restart_loop:
 				gops_agent = "ON"
 			}
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "GOPS Debug", gops_agent, "config gops_agent"))
+
+			memcached := "OFF"
+			if globals.MemcachedEnabled {
+				memcached = "ON"
+			}
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Use Memcached", memcached, "config memcached"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\n\tDiagnostic Thresholds - use (run_diagnostic) to test\n"))
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Block Transmission Success Rate Threshold", config.RunningConfig.BlockRejectThreshold, "config block_reject_threshold <seconds>"))

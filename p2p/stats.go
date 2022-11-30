@@ -162,22 +162,22 @@ func CountNetworkOrphanSince(height uint64) (total int) {
 	return total
 }
 
-func GetMinerOrphanCount(miner string) int {
+func GetMinerOrphanCount(miner string) (int, int) {
 	miner_mini_mutex.Lock()
 	defer miner_mini_mutex.Unlock()
 
-	count := 0
+	ib, mb := 0, 0
 	_, found_mb := MyOrphanMiniBlocks[miner]
 	if found_mb {
-		count += len(MyOrphanMiniBlocks[miner])
+		mb += len(MyOrphanMiniBlocks[miner])
 	}
 
 	_, found_ib := MyOrphanBlocks[miner]
 	if found_ib {
-		count += len(MyOrphanBlocks[miner])
+		ib += len(MyOrphanBlocks[miner])
 	}
 
-	return count
+	return ib, mb
 }
 
 func IsMiniBlockOrphan(mbl block.MiniBlock) bool {
