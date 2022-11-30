@@ -1522,6 +1522,16 @@ restart_loop:
 		case command == "config":
 
 			if len(line_parts) >= 2 {
+
+				if line_parts[1] == "tx_request_limit" && len(line_parts) == 3 {
+					i, err := strconv.ParseInt(line_parts[2], 10, 64)
+					if err != nil {
+						io.WriteString(l.Stderr(), "tx_request_limit need to be number\n")
+					} else {
+						config.RunningConfig.MaxTXRequest = int(i)
+					}
+				}
+
 				if line_parts[1] == "p2p_bwfactor" && len(line_parts) == 3 {
 					i, err := strconv.ParseInt(line_parts[2], 10, 64)
 					if err != nil {
@@ -1817,6 +1827,7 @@ restart_loop:
 				anto_cheat = "ON"
 			}
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Anti Cheat (Forced Mining Solo Fees)", anto_cheat, "config anti_cheat"))
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Max TX in a single request", config.RunningConfig.MaxTXRequest, "config tx_request_limit <number>"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Auto run diagnostic sequence every (seconds)", config.RunningConfig.DiagnosticCheckDelay, "config diagnostic_delay <seconds>"))
 

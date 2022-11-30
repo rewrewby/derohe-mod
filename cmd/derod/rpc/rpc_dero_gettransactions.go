@@ -43,8 +43,10 @@ func GetTransaction(ctx context.Context, p rpc.GetTransaction_Params) (result rp
 		}
 	}()
 
-	//Should we limit amount of TX in request?
-
+	if len(p.Tx_Hashes) > config.RunningConfig.MaxTXRequest {
+		err = fmt.Errorf("Too many TX in Request")
+		return
+	}
 	for i := 0; i < len(p.Tx_Hashes); i++ {
 
 		hash := crypto.HashHexToHash(p.Tx_Hashes[i])
