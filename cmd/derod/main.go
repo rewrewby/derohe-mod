@@ -238,8 +238,12 @@ func main() {
 
 	cache_err := globals.Cache.Ping()
 	if cache_err == nil {
-		logger.Info("Memcached Enabled")
-		globals.MemcachedEnabled = true
+		if !globals.Arguments["--no-memcached"].(bool) {
+			logger.Info("Memcached Enabled")
+			globals.MemcachedEnabled = true
+		} else {
+			logger.Info("Not enabling memcached - disabled with option")
+		}
 	} else {
 		logger.V(2).Error(cache_err, "Memcached")
 	}
