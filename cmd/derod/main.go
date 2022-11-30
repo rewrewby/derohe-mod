@@ -1598,6 +1598,15 @@ restart_loop:
 					}
 				}
 
+				if line_parts[1] == "miner_latency" && len(line_parts) == 3 {
+					i, err := strconv.ParseInt(line_parts[2], 10, 64)
+					if err != nil {
+						io.WriteString(l.Stderr(), "miner_latency in seconds\n")
+					} else {
+						config.RunningConfig.MinerLatency = int(i)
+					}
+				}
+
 				if line_parts[1] == "peer_latency_threshold" && len(line_parts) == 3 {
 					i, err := strconv.ParseInt(line_parts[2], 10, 64)
 					if err != nil {
@@ -1774,6 +1783,8 @@ restart_loop:
 			}
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "P2P Turbo", turbo, "config p2p_turbo"))
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "P2P BW Factor", config.RunningConfig.P2PBWFactor, "config p2p_bwfactor <num>"))
+
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Miner latency in Miliseconds", config.RunningConfig.MinerLatency, "config miner_latency <num>"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "GETWORK - Job will be dispatch time", config.RunningConfig.GETWorkJobDispatchTime, "config job_dispatch_time <miliseconds>"))
 			variable_dispatch := "OFF"

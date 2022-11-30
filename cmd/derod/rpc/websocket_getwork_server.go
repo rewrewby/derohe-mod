@@ -378,8 +378,11 @@ func SendJob() {
 			}
 
 			encoder.Encode(params)
-			k.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
-			k.WriteMessage(websocket.TextMessage, buf.Bytes())
+			k.SetWriteDeadline(time.Now().Add(time.Duration(config.RunningConfig.MinerLatency) * time.Millisecond))
+			timeout := k.WriteMessage(websocket.TextMessage, buf.Bytes())
+			if timeout != nil {
+				go MinerMetric(k.RemoteAddr().String(), v.address.String(), "lasterror", "Latency too high!")
+			}
 			buf.Reset()
 
 		}(rk, rv)

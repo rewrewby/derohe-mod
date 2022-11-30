@@ -163,6 +163,7 @@ type RUN_CONFIG struct {
 	MinerMaintenanceMessage string
 	VariableDispatchTime    bool
 	TraceTagged             bool
+	MinerLatency            int
 }
 
 var RunningConfig = RUN_CONFIG{
@@ -186,4 +187,5 @@ var RunningConfig = RUN_CONFIG{
 	TraceTx:                 true,
 	TraceTagged:             true,
 	MinerMaintenanceMessage: "System will go down for maintenance shortly",
+	MinerLatency:            100,
 }
