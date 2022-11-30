@@ -40,11 +40,13 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	}()
 
 	id := "GetInfo-derod-response"
-	val, err := globals.Cache.Get(id)
-	if err == nil {
-		if err = json.Unmarshal(val.Value, &result); err == nil {
-			// return cached result
-			return result, nil
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(id)
+		if err == nil {
+			if err = json.Unmarshal(val.Value, &result); err == nil {
+				// return cached result
+				return result, nil
+			}
 		}
 	}
 
@@ -179,12 +181,14 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	result.HashrateEstimatePercent_1day = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_1day()) / 100)
 	result.HashrateEstimatePercent_7day = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_7day()) / 100)
 
-	if data, err := json.Marshal(result); err != nil {
-		logger.V(2).Error(err, "Error exporting data")
-	} else {
-		cacheErr := globals.Cache.Set(&memcache.Item{Key: id, Value: data, Expiration: 1})
-		if cacheErr != nil {
-			logger.V(2).Error(cacheErr, "Failed to cache object")
+	if globals.MemcachedEnabled {
+		if data, err := json.Marshal(result); err != nil {
+			logger.V(2).Error(err, "Error exporting data")
+		} else {
+			cacheErr := globals.Cache.Set(&memcache.Item{Key: id, Value: data, Expiration: 1})
+			if cacheErr != nil {
+				logger.V(2).Error(cacheErr, "Failed to cache object")
+			}
 		}
 	}
 

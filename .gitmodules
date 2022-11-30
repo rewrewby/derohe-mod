@@ -1,0 +1,3 @@
+[submodule "cmd/derod/vendor/github.com/google/gops"]
+	path = cmd/derod/vendor/github.com/google/gops
+	url = https://github.com/google/gops.git

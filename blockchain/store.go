@@ -107,11 +107,13 @@ func (chain *Blockchain) Load_BL_FROM_ID(hash [32]byte) (*block.Block, error) {
 
 	// Memcached tuning
 	cache_id := fmt.Sprintf("BL-HASH-ID-%x", hash)
-	val, err := globals.Cache.Get(cache_id)
-	if err == nil {
-		if err = json.Unmarshal(val.Value, &bl); err == nil {
-			// return cached result
-			return &bl, nil
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(cache_id)
+		if err == nil {
+			if err = json.Unmarshal(val.Value, &bl); err == nil {
+				// return cached result
+				return &bl, nil
+			}
 		}
 	}
 
@@ -122,8 +124,10 @@ func (chain *Blockchain) Load_BL_FROM_ID(hash [32]byte) (*block.Block, error) {
 			return nil, err
 		}
 
-		if data, err := json.Marshal(bl); err == nil {
-			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+		if globals.MemcachedEnabled {
+			if data, err := json.Marshal(bl); err == nil {
+				globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+			}
 		}
 
 		return &bl, nil
@@ -355,11 +359,13 @@ func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Compl
 
 	// Memcached tuning
 	cache_id := fmt.Sprintf("CBL-%s", blid.String())
-	val, err := globals.Cache.Get(cache_id)
-	if err == nil {
-		if err = json.Unmarshal(val.Value, &cbl); err == nil {
-			// return cached result
-			return cbl, nil
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(cache_id)
+		if err == nil {
+			if err = json.Unmarshal(val.Value, &cbl); err == nil {
+				// return cached result
+				return cbl, nil
+			}
 		}
 	}
 
@@ -383,8 +389,10 @@ func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Compl
 	}
 
 	// memcached save
-	if data, err := json.Marshal(cbl); err == nil {
-		globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+	if globals.MemcachedEnabled {
+		if data, err := json.Marshal(cbl); err == nil {
+			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+		}
 	}
 
 	return

@@ -46,6 +46,7 @@ import (
 	"github.com/deroproject/derohe/transaction"
 	"github.com/docopt/docopt-go"
 	"github.com/go-logr/logr"
+	"github.com/google/gops/agent"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	//import "crypto/sha1"
@@ -60,7 +61,7 @@ var command_line string = `derod
 DERO : A secure, private blockchain with smart-contracts
 
 Usage:
-  derod [--help] [--version] [--testnet] [--debug]  [--sync-node] [--timeisinsync] [--fastsync] [--socks-proxy=<socks_ip:port>] [--data-dir=<directory>] [--p2p-bind=<0.0.0.0:18089>] [--add-exclusive-node=<ip:port>]... [--add-priority-node=<ip:port>]... [--min-peers=<11>] [--max-peers=<100>] [--rpc-bind=<127.0.0.1:9999>] [--getwork-bind=<0.0.0.0:18089>] [--node-tag=<unique name>] [--prune-history=<50>] [--integrator-address=<address>] [--clog-level=1] [--flog-level=1]
+  derod [--help] [--version] [--testnet] [--debug] [--debug-gops] [--no-memcached] [--sync-node] [--timeisinsync] [--fastsync] [--socks-proxy=<socks_ip:port>] [--data-dir=<directory>] [--p2p-bind=<0.0.0.0:18089>] [--add-exclusive-node=<ip:port>]... [--add-priority-node=<ip:port>]... [--min-peers=<11>] [--max-peers=<100>] [--rpc-bind=<127.0.0.1:9999>] [--getwork-bind=<0.0.0.0:18089>] [--node-tag=<unique name>] [--prune-history=<50>] [--integrator-address=<address>] [--clog-level=1] [--flog-level=1]
   derod -h | --help
   derod --version
 
@@ -238,10 +239,20 @@ func main() {
 	cache_err := globals.Cache.Ping()
 	if cache_err == nil {
 		logger.Info("Memcached Enabled")
+		globals.MemcachedEnabled = true
 	} else {
-		logger.Error(cache_err, "Memcached")
+		logger.V(2).Error(cache_err, "Memcached")
 	}
 	//go check_update_loop ()
+
+	if globals.Arguments["--debug-gops"].(bool) {
+		if err := agent.Listen(agent.Options{}); err != nil {
+			logger.Error(err, "Failed to start GOPS agent")
+		} else {
+			logger.Info("GOPS Agent started")
+			globals.GOPSAgent = true
+		}
+	}
 
 	params := map[string]interface{}{}
 
@@ -1635,6 +1646,20 @@ restart_loop:
 					}
 				}
 
+				if line_parts[1] == "gops_agent" {
+					if globals.GOPSAgent {
+						agent.Close()
+						globals.GOPSAgent = false
+					} else {
+						if err := agent.Listen(agent.Options{}); err != nil {
+							logger.Error(err, "Failed to start GOPS agent")
+						} else {
+							logger.Info("GOPS Agent started")
+							globals.GOPSAgent = true
+						}
+					}
+				}
+
 				if line_parts[1] == "p2p_turbo" {
 					if config.RunningConfig.P2PTurbo {
 						config.RunningConfig.P2PTurbo = false
@@ -1766,6 +1791,12 @@ restart_loop:
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Anti Cheat (Forced Mining Solo Fees)", anto_cheat, "config anti_cheat"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Auto run diagnostic sequence every (seconds)", config.RunningConfig.DiagnosticCheckDelay, "config diagnostic_delay <seconds>"))
+
+			gops_agent := "OFF"
+			if globals.GOPSAgent {
+				gops_agent = "ON"
+			}
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "GOPS Debug", gops_agent, "config gops_agent"))
 
 			io.WriteString(l.Stdout(), fmt.Sprintf("\n\tDiagnostic Thresholds - use (run_diagnostic) to test\n"))
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20d %-20s\n", "Block Transmission Success Rate Threshold", config.RunningConfig.BlockRejectThreshold, "config block_reject_threshold <seconds>"))

@@ -288,9 +288,11 @@ func (s *storefs) ReadTX(h [32]byte) ([]byte, error) {
 
 	// Memcached tuning
 	cache_id := fmt.Sprintf("TX-ID-%x", h)
-	val, err := globals.Cache.Get(cache_id)
-	if err == nil {
-		return val.Value, nil
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(cache_id)
+		if err == nil {
+			return val.Value, nil
+		}
 	}
 
 	{ // legacy code
@@ -308,7 +310,9 @@ func (s *storefs) ReadTX(h [32]byte) ([]byte, error) {
 
 	data, err := ioutil.ReadFile(file)
 	if err == nil {
-		globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+		if globals.MemcachedEnabled {
+			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+		}
 	}
 	return data, err
 }

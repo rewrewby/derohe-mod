@@ -78,11 +78,13 @@ func (s *storetopofs) Read(index int64) (TopoRecord, error) {
 
 	// Memcached tuning
 	cache_id := fmt.Sprintf("topofs-%d", index)
-	val, err := globals.Cache.Get(cache_id)
-	if err == nil {
-		if err = json.Unmarshal(val.Value, &record); err == nil {
-			// return cached result
-			return record, nil
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(cache_id)
+		if err == nil {
+			if err = json.Unmarshal(val.Value, &record); err == nil {
+				// return cached result
+				return record, nil
+			}
 		}
 	}
 
@@ -94,8 +96,10 @@ func (s *storetopofs) Read(index int64) (TopoRecord, error) {
 	record.Height = int64(binary.LittleEndian.Uint64(buf[len(record.BLOCK_ID)+8:]))
 
 	// memcached save
-	if data, err := json.Marshal(record); err == nil {
-		globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+	if globals.MemcachedEnabled {
+		if data, err := json.Marshal(record); err == nil {
+			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+		}
 	}
 
 	return record, nil
@@ -107,9 +111,11 @@ func (s *storetopofs) Write(index int64, blid [32]byte, state_version uint64, he
 	var zero_hash [32]byte
 
 	// Clear memcached for this index in-case it is set
-	cache_id := fmt.Sprintf("topofs-%d", index)
-	cache_err := globals.Cache.Delete(cache_id)
-	if cache_err == nil {
+	if globals.MemcachedEnabled {
+		cache_id := fmt.Sprintf("topofs-%d", index)
+		cache_err := globals.Cache.Delete(cache_id)
+		if cache_err == nil {
+		}
 	}
 
 	copy(buf[:], blid[:])

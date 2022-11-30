@@ -468,4 +468,6 @@ var CountMinisRejected int64 // total rejected // note we are only counting reje
 // Network Wide - My total blocks are CountBlocks+CountMinisAccepted
 var CountTotalBlocks int64
 
+var GOPSAgent bool = false
+var MemcachedEnabled bool = false
 var Cache = memcache.New("localhost:11211")
