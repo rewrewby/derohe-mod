@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/deroproject/derohe/globals"
 )
 
@@ -285,36 +284,17 @@ func (s *storefs) WriteBlock(h [32]byte, data []byte, difficulty *big.Int, ss_ve
 }
 
 func (s *storefs) ReadTX(h [32]byte) ([]byte, error) {
-
-	// Memcached tuning
-	cache_id := fmt.Sprintf("TX-ID-%x", h)
-	if globals.MemcachedEnabled {
-		val, err := globals.Cache.Get(cache_id)
-		if err == nil {
-			return val.Value, nil
-		}
-	}
-
 	{ // legacy code
 		dir := s.getpath(h)
 		file := filepath.Join(dir, fmt.Sprintf("%x.tx", h[:]))
 		if data, err := ioutil.ReadFile(file); err == nil {
-			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
-
 			return data, err
 		}
 	}
 
 	dir := s.getpathtx(h)
 	file := filepath.Join(dir, fmt.Sprintf("%x.tx", h[:]))
-
-	data, err := ioutil.ReadFile(file)
-	if err == nil {
-		if globals.MemcachedEnabled {
-			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
-		}
-	}
-	return data, err
+	return ioutil.ReadFile(file)
 }
 
 func (s *storefs) WriteTX(h [32]byte, data []byte) (err error) {
