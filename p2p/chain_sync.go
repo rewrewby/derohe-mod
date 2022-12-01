@@ -407,6 +407,11 @@ func (connection *Connection) process_object_response(response Objects, sent int
 
 	}
 
+	if len(response.Txs) > config.RunningConfig.MaxTXRequest {
+		err = fmt.Errorf("Too many TX in Request")
+		return nil
+	}
+
 	for i := range response.Txs { // process incoming txs for mempool
 		var tx transaction.Transaction
 		err = tx.Deserialize(response.Txs[i])
