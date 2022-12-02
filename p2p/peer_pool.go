@@ -67,6 +67,8 @@ type Peer struct {
 	sync.Mutex
 }
 
+var AllSeenPeers = make(map[string]int64)
+
 var peer_map = map[string]*Peer{}
 var peer_mutex sync.Mutex
 
@@ -218,6 +220,22 @@ func IsPeerTraced(ip string) bool {
 	return found
 }
 
+func CountAllSeenPeer() int {
+
+	peer_mutex.Lock()
+	defer peer_mutex.Unlock()
+
+	chain_hight := chain.Get_Height()
+
+	for peer, height := range AllSeenPeers {
+		if height < chain_hight-config.RunningConfig.NetworkStatsKeepCount {
+			delete(AllSeenPeers, peer)
+		}
+	}
+
+	return len(AllSeenPeers)
+}
+
 // add connection to  map
 func Peer_Add(p *Peer) {
 	clean_up()
@@ -229,6 +247,8 @@ func Peer_Add(p *Peer) {
 		return
 
 	}
+
+	AllSeenPeers[ParseIPNoError(p.Address)] = chain.Get_Height()
 
 	// trusted only if enabled
 	if config.RunningConfig.OnlyTrusted {
