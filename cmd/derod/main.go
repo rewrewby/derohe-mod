@@ -1074,7 +1074,7 @@ restart_loop:
 			for _, tip := range tips {
 				fmt.Printf(" %s(%d)\n", tip, chain.Load_Height_for_BL_ID(tip))
 			}
-			fmt.Printf(blue+"Total Network Peers Count: %d\n"+reset_color, p2p.CountAllSeenPeer())
+			fmt.Printf(blue+"Total Network Peers Count: %s%d\n"+reset_color, yellow, p2p.CountAllSeenPeer())
 
 			if chain.LocatePruneTopo() >= 1 {
 				fmt.Printf(blue+"\nChain is pruned till "+yellow+"%d"+reset_color+"\n", chain.LocatePruneTopo())
