@@ -1249,27 +1249,30 @@ func (chain *Blockchain) RegPoolBuffer(tx *transaction.Transaction) {
 	}
 
 buffer_loop:
-	for len(RegBuffer) >= 1 && regbuf_height_count[height] < max_registration_per_height {
+	for chain.RegPoolBufferSize() >= 1 {
+		if regbuf_height_count[height] < max_registration_per_height {
 
-		var x *transaction.Transaction
-		x, RegBuffer = RegBuffer[len(RegBuffer)-1], RegBuffer[:len(RegBuffer)-1]
+			var x *transaction.Transaction
+			regbuf_lock.Lock()
+			x, RegBuffer = RegBuffer[len(RegBuffer)-1], RegBuffer[:len(RegBuffer)-1]
+			regbuf_lock.Unlock()
 
-		for _, processed_tx := range bl.Tx_hashes {
-			hash := x.GetHash()
-			if hash == processed_tx {
-				logger.Info("Reg TX already processed", "tx", hash)
-				continue buffer_loop
+			for _, processed_tx := range bl.Tx_hashes {
+				hash := x.GetHash()
+				if hash == processed_tx {
+					logger.Info("Reg TX already processed, skipping", "tx", hash)
+					continue buffer_loop
+				}
 			}
-		}
 
-		if chain.Regpool.Regpool_Add_TX(x, 0) {
-			go LogTx(tx, chain.Get_Height())
-			regbuf_height_count[height]++
+			if chain.Regpool.Regpool_Add_TX(x, 0) {
+				go LogTx(tx, chain.Get_Height())
+				regbuf_height_count[height]++
+			}
+		} else {
+			logger.Info("Registration TX overflow limit", "limit", max_registration_per_height)
+			time.Sleep(10 * time.Second)
 		}
-	}
-
-	if regbuf_height_count[height] >= max_registration_per_height {
-		logger.Info("Registration TX overflow limit", "limit", max_registration_per_height)
 	}
 	RegBufferRunning = false
 }
