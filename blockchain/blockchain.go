@@ -1212,6 +1212,66 @@ func (chain *Blockchain) BlockCheckSum(cbl *block.Complete_Block) []byte {
 	return h.Sum(nil)
 }
 
+var RegBufferRunning bool
+var RegBuffer []*transaction.Transaction
+var regbuf_lock sync.Mutex
+var regbuf_height_count = make(map[int64]int)
+var max_registration_per_height = 100
+
+func (chain *Blockchain) RegPoolBufferSize() int {
+
+	regbuf_lock.Lock()
+	defer regbuf_lock.Unlock()
+	return len(RegBuffer)
+
+}
+
+func (chain *Blockchain) RegPoolBuffer(tx *transaction.Transaction) {
+
+	regbuf_lock.Lock()
+	RegBuffer = append(RegBuffer, tx)
+	regbuf_lock.Unlock()
+
+	if RegBufferRunning {
+		return
+	}
+
+	RegBufferRunning = true
+	height := chain.Get_Height()
+
+	block, err := chain.Load_Block_Topological_order_at_index(height)
+	if err != nil {
+		return
+	}
+	bl, err := chain.Load_BL_FROM_ID(block)
+	if err != nil {
+		return
+	}
+
+buffer_loop:
+	for len(RegBuffer) >= 1 && regbuf_height_count[height] < max_registration_per_height {
+
+		var x *transaction.Transaction
+		x, RegBuffer = RegBuffer[len(RegBuffer)-1], RegBuffer[:len(RegBuffer)-1]
+
+		for _, processed_tx := range bl.Tx_hashes {
+			if x.GetHash() == processed_tx {
+				continue buffer_loop
+			}
+		}
+
+		if chain.Regpool.Regpool_Add_TX(x, 0) {
+			go LogTx(tx, chain.Get_Height())
+			regbuf_height_count[height]++
+		}
+	}
+
+	if regbuf_height_count[height] >= max_registration_per_height {
+		logger.Info("Registration TX overflow limit", "limit", max_registration_per_height)
+	}
+	RegBufferRunning = false
+}
+
 // this is the only entrypoint for new txs in the chain
 // add a transaction to MEMPOOL,
 // verifying everything  means everything possible
@@ -1235,12 +1295,7 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 				if _, err := balance_tree.Get(tx.MinerAddress[:]); err == nil { // address already registered
 					return fmt.Errorf("address already registered")
 				} else { // add  to regpool
-					if chain.Regpool.Regpool_Add_TX(tx, 0) {
-						go LogTx(tx, chain.Get_Height())
-						return nil
-					} else {
-						return fmt.Errorf("registration for address is already pending")
-					}
+					go chain.RegPoolBuffer(tx)
 				}
 			} else {
 				return err

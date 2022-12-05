@@ -1061,7 +1061,6 @@ restart_loop:
 			goprocs := fmt.Sprintf("%sGO Procs %s[%s%d%s/%s%d%s]%s", yellow, blue, green, goStartCount, blue, green, globals.CountGoProcs(), blue, reset_color)
 
 			fmt.Printf(blue+"DERO 🥷 Daemon - %s - %s - %s - %s\n", threads, mutex, blocked, goprocs)
-
 			fmt.Printf(blue+"Version: %s%s\n\n", yellow, config.Version.String())
 
 			fmt.Printf(blue+"Hostname: %s%s %sUptime: %s%s %sBlock(s): %s%d\n", green, hostname, blue, green, time.Now().Sub(globals.StartTime).Round(time.Second).String(), blue, green, (chain.Get_Height() - globals.BlockChainStartHeight))
@@ -1087,6 +1086,7 @@ restart_loop:
 			fmt.Printf("Local time %s  (as per system clock) \n", time.Now())
 			fmt.Printf("Local time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time(), time.Now().Sub(globals.Time()))
 			fmt.Printf("Block Pop Count: %d\n\n", globals.BlockPopCount)
+			fmt.Printf("Reg TX Buffer Size: %d\n", chain.RegPoolBufferSize())
 
 			total_orphans := p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
 			network_loss := float64(0)
