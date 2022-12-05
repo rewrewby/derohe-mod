@@ -146,10 +146,12 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			return err
 		}
 
-		mbls = append(mbls, mbl)
+		// MiniBlock Spam Prevention
+		if mbl.Height >= uint64(chain.Get_Height()-1) {
+			mbls = append(mbls, mbl)
+		}
 
 		atomic.AddUint64(&c.BytesIn, 1)
-		go LogMiniblock(mbl, c.Addr.String())
 	}
 
 	for _, mbl := range mbls {
@@ -209,6 +211,7 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			go LogReject(c.Addr.String())
 			return err
 		} else { // rebroadcast miniblock
+			go LogMiniblock(mbl, c.Addr.String())
 
 			chain.MiniBlocks.RLock()
 			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
