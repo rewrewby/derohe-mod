@@ -1255,7 +1255,9 @@ buffer_loop:
 		x, RegBuffer = RegBuffer[len(RegBuffer)-1], RegBuffer[:len(RegBuffer)-1]
 
 		for _, processed_tx := range bl.Tx_hashes {
-			if x.GetHash() == processed_tx {
+			hash := x.GetHash()
+			if hash == processed_tx {
+				logger.Info("Reg TX already processed", "tx", hash)
 				continue buffer_loop
 			}
 		}
