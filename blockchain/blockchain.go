@@ -1272,6 +1272,7 @@ buffer_loop:
 		} else {
 			logger.Info("Registration TX overflow limit", "limit", max_registration_per_height)
 			time.Sleep(10 * time.Second)
+			height = chain.Get_Height()
 		}
 	}
 	RegBufferRunning = false
