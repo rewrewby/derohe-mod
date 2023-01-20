@@ -366,6 +366,9 @@ func main() {
 	globals.Cron.Start() // start cron jobs
 
 	globals.Cron.AddFunc("@every 10s", p2p.UpdateLiveBlockData)
+
+	globals.Cron.AddFunc("@every 60s", globals.CleanupForeignMiniCounter)
+
 	// This tiny goroutine continuously updates status as required
 
 	// go func() {
@@ -1352,7 +1355,7 @@ restart_loop:
 
 			fmt.Printf("Network Mining Stats - %s - Showing %d/%d miners\n\n", keep_string, show_count, len(active_miners))
 
-			fmt.Printf("%-76s %-8s %-8s %-8s %-8s %-14s %-16s %-26s\n", "Miner Address", "IB", "MB", "IBO", "MBO", "Orphan Loss", "Dominance", "Node (Probability)")
+			fmt.Printf("%-70s %-14s %-6s %-6s %-6s %-6s %-12s %-14s %-26s\n", "Miner Address", "Hashrate", "IB", "MB", "IBO", "MBO", "Loss", "Dominance", "Node (Probability)")
 
 			var count int = 0
 			for _, miner := range ordered_minder {
@@ -1367,7 +1370,12 @@ restart_loop:
 
 				node_string := fmt.Sprintf("%-16s (%.2f%%)", node, probabiliy)
 				orphan_string := fmt.Sprintf("%.2f%%", orphan_loss)
-				fmt.Printf("%-76s %-8d %-8d %-8d %-8d %-14s %-16s %-26s\n", miner, active_miners[miner]["finals"], active_miners[miner]["minis"], active_miners[miner]["ibo"], active_miners[miner]["mbo"], orphan_string, dominance, node_string)
+
+				mh_1hr := uint64((float64(chain.Get_Network_HashRate()) * globals.ForeignHashrateEstimatePercent_1hr(miner)) / 100)
+
+				fmt.Printf("%-70s %-14s %-6d %-6d %-6d %-6d %-12s %-14s %-26s\n", miner, hashratetostring(mh_1hr),
+					active_miners[miner]["finals"], active_miners[miner]["minis"], active_miners[miner]["ibo"],
+					active_miners[miner]["mbo"], orphan_string, dominance, node_string)
 				count++
 
 			}

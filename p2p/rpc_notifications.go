@@ -237,6 +237,10 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 
 			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
 
+			globals.ForeignMiniFoundTime_lock.Lock()
+			defer globals.ForeignMiniFoundTime_lock.Unlock()
+			globals.ForeignMiniFoundTime[wallet] = append(globals.ForeignMiniFoundTime[wallet], time.Now().Unix())
+
 			go LogAccept(c.Addr.String())
 
 		}

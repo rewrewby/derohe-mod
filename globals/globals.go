@@ -22,6 +22,8 @@ import (
 	"math"
 	"math/big"
 	"net/url"
+	"sort"
+	"sync"
 
 	"os"
 
@@ -471,3 +473,58 @@ var CountTotalBlocks int64
 var GOPSAgent bool = false
 var MemcachedEnabled bool = false
 var Cache = memcache.New("localhost:11211")
+
+// this will track foreign miniblock rate,
+var ForeignMiniFoundTime = make(map[string][]int64) // this array contains a epoch timestamp in int64
+var ForeignMiniFoundTime_lock sync.Mutex
+
+// this function will return wrong result if too wide time glitches happen to system clock
+func ForeignMiniCounter(wallet string, seconds int64) (r int) { // we need atleast 1 mini to find a rate
+	ForeignMiniFoundTime_lock.Lock()
+	defer ForeignMiniFoundTime_lock.Unlock()
+	length := len(ForeignMiniFoundTime[wallet])
+	if length > 0 {
+		start_point := time.Now().Unix() - seconds
+		i := sort.Search(length, func(i int) bool { return ForeignMiniFoundTime[wallet][i] >= start_point })
+		if i < len(ForeignMiniFoundTime[wallet]) {
+			r = length - i
+		}
+	}
+	return // return 0
+}
+
+func CleanupForeignMiniCounter() {
+	ForeignMiniFoundTime_lock.Lock()
+	defer ForeignMiniFoundTime_lock.Unlock()
+
+	for wallet, _ := range ForeignMiniFoundTime {
+
+		length := len(ForeignMiniFoundTime[wallet])
+		if length > 0 {
+			start_point := time.Now().Unix() - 30*24*3600 // only keep data of last 30 days
+			i := sort.Search(length, func(i int) bool { return ForeignMiniFoundTime[wallet][i] >= start_point })
+			if i > 1000 && i < length {
+				ForeignMiniFoundTime[wallet] = append(ForeignMiniFoundTime[wallet][:0], ForeignMiniFoundTime[wallet][i:]...) // renew the array
+			}
+		}
+	}
+}
+
+func ForeignHashrateEstimatePercent(wallet string, timeframe int64) float64 {
+	return float64(ForeignMiniCounter(wallet, timeframe)*100) / (float64(timeframe*10) / float64(config.BLOCK_TIME))
+}
+
+// note this will be be 0, if you have less than 1/48000 hash power
+func ForeignHashrateEstimatePercent_1hr(wallet string) float64 {
+	return ForeignHashrateEstimatePercent(wallet, 3600)
+}
+
+// note result will be 0, if you have  less than 1/2000 hash power
+func ForeignHashrateEstimatePercent_1day(wallet string) float64 {
+	return ForeignHashrateEstimatePercent(wallet, 24*3600)
+}
+
+// note this will be 0, if you have less than 1/(48000*7)
+func ForeignHashrateEstimatePercent_7day(wallet string) float64 {
+	return ForeignHashrateEstimatePercent(wallet, 7*24*3600)
+}
