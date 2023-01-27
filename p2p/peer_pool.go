@@ -112,7 +112,7 @@ func Peer_Count_Whitelist() (Count uint64) {
 	return
 }
 
-//save peer list to disk
+// save peer list to disk
 func save_peer_list() {
 
 	clean_up()
@@ -189,6 +189,10 @@ func ClearTraceList() {
 	defer trace_lock.Unlock()
 	PeerTraceList = NewList
 
+	for _, conn := range UniqueConnections() {
+		conn.ActiveTrace = false
+	}
+
 }
 
 func AddPeerTraceList(Address string) {
@@ -204,6 +208,11 @@ func AddPeerTraceList(Address string) {
 	defer trace_lock.Unlock()
 	PeerTraceList = append(PeerTraceList, Address)
 
+	for _, conn := range UniqueConnections() {
+		if ParseIPNoError(conn.Addr.String()) == Address {
+			conn.ActiveTrace = true
+		}
+	}
 }
 
 func IsPeerTraced(ip string) bool {

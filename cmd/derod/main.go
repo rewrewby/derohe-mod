@@ -1858,6 +1858,17 @@ restart_loop:
 
 			io.WriteString(l.Stdout(), "\n")
 
+		case command == "trace_peer":
+
+			if len(line_parts) == 2 {
+
+				p2p.AddPeerTraceList(line_parts[1])
+
+			} else {
+				fmt.Printf("usage: trace_peer <ip address>\n")
+
+			}
+
 		case command == "add_trusted":
 
 			var trusted string
@@ -2233,6 +2244,7 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mactive_miners\033[0m\tShow Active Miners on Network\n")
 	io.WriteString(w, "\t\033[1mactive_nodes\033[0m\tShow Active Mining Nodes\n")
 	io.WriteString(w, "\t\033[1mshow_selfish\033[0m\tShow Nodes that don't play nice\n")
+	io.WriteString(w, "\t\033[1mtrace_peer <ip>\033[0m\tTrace Peer Communication\n")
 
 }
 
@@ -2284,6 +2296,7 @@ var completer = readline.NewPrefixCompleter(
 	readline.PcItem("mined_blocks"),
 	readline.PcItem("address_to_name"),
 	readline.PcItem("show_selfish"),
+	readline.PcItem("trace_peer"),
 )
 
 func filterInput(r rune) (rune, bool) {

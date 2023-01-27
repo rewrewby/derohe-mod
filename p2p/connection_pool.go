@@ -106,6 +106,8 @@ type Connection struct {
 
 	Mutex       sync.Mutex // used only by connection go routine
 	Hansen33Mod bool
+	Trusted     bool
+	ActiveTrace bool
 }
 
 func ConnecToNode(address string) {
@@ -122,6 +124,11 @@ func Address(c *Connection) string {
 
 func (c *Connection) exit() {
 	defer globals.Recover(0)
+
+	if c.ActiveTrace {
+		c.logger.Info("Connection exiting")
+	}
+
 	c.onceexit.Do(func() {
 		c.Client.Close()
 		c.ConnTls.Close()
@@ -276,6 +283,10 @@ func ping_loop() {
 					request.Common.PeerList = get_peer_list_specific(Address(c))
 				}
 
+				if c.ActiveTrace {
+					c.logger.Info("Outgoing Ping Request", "request", request)
+				}
+
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 
@@ -283,10 +294,19 @@ func ping_loop() {
 					// peer_log := globals.Logger.WithName("peer2").WithName(c.Addr.String())
 					// peer_log.V(2).Error(err, "ping failed")
 					c.logger.V(4).Error(err, "ping failed")
+					if c.ActiveTrace {
+						c.logger.V(0).Error(err, "ping failed")
+						c.logger.Info("Outgoing Ping Request Failed", "response", response)
+					}
+
 					c.exit()
 					return
 				}
 				c.update(&response.Common) // update common information
+				if c.ActiveTrace {
+					c.logger.Info("Outgoing Ping Request", "response", response)
+				}
+
 			}()
 		}
 		return true

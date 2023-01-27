@@ -97,7 +97,7 @@ func LoadTrustedList() {
 
 }
 
-//save peer list to disk
+// save peer list to disk
 func SaveTrustList() {
 
 	trust_mutex.Lock()
@@ -154,6 +154,8 @@ func Add_Trusted(Addr string) {
 	if !found {
 		trusted_map[Addr] = int64(time.Now().UTC().Unix())
 	}
+
+	// Mainnet_seed_nodes - add to this to maintain connections
 
 	go SaveTrustList()
 

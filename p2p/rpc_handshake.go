@@ -72,22 +72,43 @@ func (connection *Connection) dispatch_test_handshake() {
 	//scan our peer list and send peers which have been recently communicated
 	request.PeerList = get_peer_list_specific(Address(connection))
 
+	if connection.ActiveTrace {
+		connection.logger.Info("Outgoing Handshake Request", "Request", request)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	if err := connection.Client.CallWithContext(ctx, "Peer.Handshake", request, &response); err != nil {
 		connection.logger = logger.WithName(connection.Addr.String())
+
+		if connection.ActiveTrace {
+			connection.logger.Error(err, "cannot handshake")
+			connection.logger.Info("Outgoing Handshake Request - Failed", "Response", response)
+
+		}
+
 		connection.logger.V(4).Error(err, "cannot handshake")
 		connection.exit()
 		return
 	}
 
+	if connection.ActiveTrace {
+		connection.logger.Info("Outgoing Handshake Request", "Response", response)
+	}
+
 	if !Verify_Handshake(&response) { // if not same network boot off
+		if connection.ActiveTrace {
+			connection.logger.Info("Outgoing Handshake Request - Failed Verify", "Response", response)
+		}
 		connection.logger.V(3).Info("terminating connection network id mismatch ", "networkid", response.Network_ID)
 		connection.exit()
 		return
 	}
 	connection.update(&response.Common) // update common information
 	if !Connection_Add(connection) {    // add connection to pool
+		if connection.ActiveTrace {
+			connection.logger.Info("Outgoing Handshake Request - Could not Add!", "Response", response)
+		}
 		connection.exit()
 		return
 	}
@@ -95,8 +116,11 @@ func (connection *Connection) dispatch_test_handshake() {
 	if len(response.Tag) >= 1 && config.RunningConfig.TraceTagged {
 
 		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
-		host_string := fmt.Sprintf(green+"%s - "+yellow+"%s "+red+"   [ "+blue+"Connected "+red+"]"+reset_color, response.Tag, connection.Addr.String())
-
+		direction := "Incoming"
+		if !connection.Incoming {
+			direction = "Outgoing"
+		}
+		host_string := fmt.Sprintf(red+"[ "+blue+" New %s Connection "+red+"]\t"+yellow+"%s\t"+green+"%s "+reset_color, direction, connection.Addr.String(), response.Tag)
 		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-80s"+reset_color, height_txt, host_string))
 	}
 
@@ -134,7 +158,7 @@ func (connection *Connection) dispatch_test_handshake() {
 	}
 
 	if len(response.PeerList) >= 1 {
-		if IsTrustedIP(connection.Addr.String()) {
+		if connection.Trusted {
 			connection.logger.V(2).Info("Trusted Peer provides peers in dispatch_test_handshake", "count", len(response.PeerList))
 			connection.logger.V(3).Info("Trusted Peer provides peers in dispatch_test_handshake", "peers", response.PeerList)
 		} else {
@@ -156,10 +180,17 @@ func (connection *Connection) dispatch_test_handshake() {
 // used to ping pong
 func (c *Connection) Ping(request Dummy, response *Dummy) error {
 	defer handle_connection_panic(c)
+
 	fill_common_T1(&request.Common)
 	c.update(&request.Common)                             // update common information
 	fill_common(&response.Common)                         // fill common info
 	fill_common_T0T1T2(&request.Common, &response.Common) // fill time related information
+
+	if c.ActiveTrace {
+		c.logger.Info("Incoming Ping Request", "request", request)
+		c.logger.Info("Incoming Ping Request", "response", response)
+	}
+
 	return nil
 }
 
@@ -178,11 +209,19 @@ func (c *Connection) Handshake(request Handshake_Struct, response *Handshake_Str
 		return fmt.Errorf("NID mismatch")
 	}
 
+	if c.ActiveTrace {
+		c.logger.Info("Incoming Handshake Request", "request", request)
+	}
+
 	response.Fill()
+
+	if c.ActiveTrace {
+		c.logger.Info("Incoming Handshake Request", "response", response)
+	}
 
 	c.update(&request.Common) // update common information
 	if c.State == ACTIVE {
-		if IsTrustedIP(c.Addr.String()) {
+		if c.Trusted {
 			c.logger.V(2).Info("Peer provides peers in handshake", "count", len(request.PeerList))
 			c.logger.V(3).Info("Peer provides peers in handshake", "peers", request.PeerList)
 		} else {
@@ -195,7 +234,7 @@ func (c *Connection) Handshake(request Handshake_Struct, response *Handshake_Str
 			}
 		}
 	}
-	if config.RunningConfig.WhitelistIncoming || !c.Incoming {
+	if !c.Incoming {
 		Peer_SetSuccess(c.Addr.String())
 	}
 

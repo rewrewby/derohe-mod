@@ -497,12 +497,8 @@ func maintain_connection_to_peers() {
 
 		peer := find_peer_to_connect(1)
 		if peer != nil && !IsAddressConnected(ParseIPNoError(peer.Address)) {
-			sync := false
-			if IsTrustedIP(peer.Address) {
-				sync = true
-			}
 
-			go connect_with_endpoint(peer.Address, sync)
+			go connect_with_endpoint(peer.Address, false)
 
 		}
 	}
@@ -539,12 +535,12 @@ func P2P_Server_v2() {
 		tlsconn_interface, _ := c.State.Get("tlsconn")
 		tlsconn := tlsconn_interface.(net.Conn)
 
-		connection := &Connection{Client: c, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: true}
+		connection := &Connection{Client: c, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: true, Trusted: IsTrustedIP(remote_addr.String()), ActiveTrace: IsPeerTraced(remote_addr.String())}
 		new_logger := logger.WithName(remote_addr.String())
 		connection.logger = new_logger
 
-		if IsPeerTraced(remote_addr.String()) {
-			connection.logger.Info("Traced Peer - Reconnects")
+		if connection.ActiveTrace {
+			connection.logger.Info("Incoming Connection")
 		}
 
 		in, out := Peer_Direction_Count()
@@ -703,7 +699,7 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 
 	client := rpc2.NewClientWithCodec(NewCBORCodec(tlsconn))
 
-	c := &Connection{Client: client, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: incoming, SyncNode: sync_node}
+	c := &Connection{Client: client, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: incoming, SyncNode: sync_node, Trusted: IsTrustedIP(remote_addr.String()), ActiveTrace: IsPeerTraced(remote_addr.String())}
 	defer c.exit()
 	new_logger := logger.WithName("outgoing").WithName(remote_addr.String())
 	c.logger = new_logger
