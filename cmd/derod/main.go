@@ -1831,6 +1831,11 @@ restart_loop:
 			}
 			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Track Live TX", tx_trace, "config tx_tracking"))
 
+			tagged_trace := "OFF"
+			if config.RunningConfig.TraceNewConnections {
+				tagged_trace = "ON"
+			}
+			io.WriteString(l.Stdout(), fmt.Sprintf("\t%-60s %-20s %-20s\n", "Track Connecting Peers", tagged_trace, "config track_connections"))
 			anto_cheat := "OFF"
 			if config.RunningConfig.AntiCheat {
 				anto_cheat = "ON"
