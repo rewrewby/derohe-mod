@@ -1114,7 +1114,7 @@ restart_loop:
 			fmt.Printf(blue+"Network Orphan Mini Block Rate: "+network_orphan_color+"%.2f%%"+reset_color+"\n", network_loss)
 
 			fmt.Print(blue + "\nPeer Stats:\n" + reset_color)
-			fmt.Printf("\tPeer ID:"+yellow+" %d\n"+reset_color, p2p.GetPeerID())
+			fmt.Printf("\tPeer ID:"+yellow+" %d"+blue+" - "+reset_color+"Peer Port: "+yellow+"%d\n"+reset_color, p2p.GetPeerID(), p2p.P2P_Port)
 			fmt.Printf("\tNode Tag:"+yellow+" %s\n"+reset_color, p2p.GetNodeTag())
 
 			blocksMinted := (globals.CountMinisAccepted + globals.CountBlocksAccepted)
