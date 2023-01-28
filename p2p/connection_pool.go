@@ -122,13 +122,24 @@ func Address(c *Connection) string {
 	return ParseIPNoError(c.Addr.String())
 }
 
+var last_to_disconnect string // dedup output
 func (c *Connection) exit() {
 	defer globals.Recover(0)
 
-	if c.ActiveTrace {
-		c.logger.Info("Connection exiting")
+	if config.RunningConfig.TraceNewConnections && ParseIPNoError(c.Addr.String()) != last_to_disconnect && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
+		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+
+		connection_string := red + "[ " + blue + "Connection Disconnected " + red + "]"
+		host_string := fmt.Sprintf("%s", c.Addr.String())
+		tag_string := fmt.Sprintf("%s ", c.Tag)
+		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-44s "+yellow+"%-24s "+green+"%-22s"+reset_color, height_txt, connection_string, host_string, tag_string))
 	}
 
+	if c.ActiveTrace {
+		c.logger.Info("Connection disconnected")
+	}
+
+	last_to_disconnect = ParseIPNoError(c.Addr.String())
 	c.onceexit.Do(func() {
 		c.Client.Close()
 		c.ConnTls.Close()
@@ -140,18 +151,6 @@ func (c *Connection) exit() {
 
 // add connection to  map
 func Connection_Delete(c *Connection) {
-
-	duplicate_connection_mutex.Lock()
-	defer duplicate_connection_mutex.Unlock()
-	ip_str, x := ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())]
-	if x {
-		if ip_str == c.Addr.String() {
-			c.logger.V(2).Info(fmt.Sprintf("Deleting Connection: %s", c.Addr.String()))
-			delete(ConnectDuplicatioMap, ParseIPNoError(c.Addr.String()))
-		} else {
-			c.logger.V(2).Info(fmt.Sprintf("Deleting Duplicate Connection: %s vs %s", ip_str, c.Addr.String()))
-		}
-	}
 
 	connection_map.Range(func(k, value interface{}) bool {
 		v := value.(*Connection)
@@ -215,18 +214,7 @@ func IsAddressConnected(address string) bool {
 
 var connection_counter int = 0
 
-var ConnectDuplicatioMap = make(map[string]string)
-var duplicate_connection_mutex sync.Mutex
-
 func Connection_Add(c *Connection) bool {
-
-	duplicate_connection_mutex.Lock()
-	defer duplicate_connection_mutex.Unlock()
-	_, x := ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())]
-	if x {
-		c.logger.Info(fmt.Sprintf("Connection (%s) already added (%s)", c.Addr.String(), ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())]))
-		return true
-	}
 
 	if dup, ok := connection_map.LoadOrStore(Address(c), c); !ok {
 
@@ -235,8 +223,6 @@ func Connection_Add(c *Connection) bool {
 		c.update_received = time.Now()
 
 		c.logger.V(3).Info(fmt.Sprintf("IP address being added (%d)", connection_counter), "ip", c.Addr.String())
-
-		ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())] = c.Addr.String()
 
 		return true
 	} else {

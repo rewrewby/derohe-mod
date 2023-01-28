@@ -120,8 +120,11 @@ func (connection *Connection) dispatch_test_handshake() {
 			direction = "Outgoing"
 		}
 
-		host_string := fmt.Sprintf(red+"[ "+blue+" New %s Connection "+red+"]\t"+yellow+"%s\t"+green+"%s "+reset_color, direction, connection.Addr.String(), response.Tag)
-		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-80s"+reset_color, height_txt, host_string))
+		connection_string := fmt.Sprintf(red+"[ "+blue+"%s Connection "+red+"]", direction)
+
+		host_string := fmt.Sprintf("%s", connection.Addr.String())
+		tag_string := fmt.Sprintf("%s ", response.Tag)
+		globals.Console_Only_Logger.Info(fmt.Sprintf("%-33s %-42s "+yellow+"%-24s "+green+"%-22s"+reset_color, height_txt, connection_string, host_string, tag_string))
 	}
 
 	if len(response.ProtocolVersion) < 128 {
