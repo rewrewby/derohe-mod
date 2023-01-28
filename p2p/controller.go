@@ -319,12 +319,12 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 
 	ip := ParseIPNoError(remote_ip.String())
 
-	if shouldwebackoff(ip) {
+	if shouldwebackoff(endpoint) {
 		logger.V(4).Info("backing off from this connection", "ip", remote_ip.String())
 		return
 	} else {
 		backoff_mutex.Lock()
-		backoff[ip] = time.Now().Unix() + 10
+		backoff[endpoint] = time.Now().Unix() + 10
 		backoff_mutex.Unlock()
 	}
 
@@ -607,7 +607,7 @@ func P2P_Server_v2() {
 		raddr := conn.RemoteAddr().(*net.UDPAddr)
 
 		backoff_mutex.Lock()
-		backoff[ParseIPNoError(raddr.String())] = time.Now().Unix() + globals.Global_Random.Int63n(200) // random backing of upto 200 secs
+		backoff[raddr.String()] = time.Now().Unix() + globals.Global_Random.Int63n(200) // random backing of upto 200 secs
 		backoff_mutex.Unlock()
 
 		logger.V(3).Info("accepting incoming connection", "raddr", raddr.String())
