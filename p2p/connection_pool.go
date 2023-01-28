@@ -122,23 +122,8 @@ func Address(c *Connection) string {
 	return ParseIPNoError(c.Addr.String())
 }
 
-var last_to_disconnect string // dedup output
 func (c *Connection) exit() {
 	defer globals.Recover(0)
-
-	if config.RunningConfig.TraceNewConnections && c.Addr.String() != last_to_disconnect && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
-		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
-
-		connection_string := red + "[ " + blue + "Connection Disconnected " + red + "]"
-		host_string := fmt.Sprintf("%s", c.Addr.String())
-		tag_string := fmt.Sprintf("%s ", c.Tag)
-		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-44s "+yellow+"%-24s "+green+"%-22s"+reset_color, height_txt, connection_string, host_string, tag_string))
-		last_to_disconnect = c.Addr.String()
-	}
-
-	if c.ActiveTrace {
-		c.logger.Info("Connection disconnected")
-	}
 
 	c.onceexit.Do(func() {
 		c.Client.Close()
@@ -148,6 +133,8 @@ func (c *Connection) exit() {
 	})
 
 }
+
+var last_to_disconnect string // dedup output
 
 // add connection to  map
 func Connection_Delete(c *Connection) {
@@ -160,6 +147,19 @@ func Connection_Delete(c *Connection) {
 			c.exit()
 			// if ParseIPNoError(c.Addr.String()) == ParseIPNoError(v.Addr.String()) {
 			connection_map.Delete(Address(v))
+			if config.RunningConfig.TraceNewConnections && c.Addr.String() != last_to_disconnect && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
+				height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+
+				connection_string := red + "[ " + blue + "Connection Disconnected " + red + "]"
+				host_string := fmt.Sprintf("%s", c.Addr.String())
+				tag_string := fmt.Sprintf("%s ", c.Tag)
+				globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-44s "+yellow+"%-24s "+green+"%-22s"+reset_color, height_txt, connection_string, host_string, tag_string))
+				last_to_disconnect = c.Addr.String()
+			}
+
+			if c.ActiveTrace {
+				c.logger.Info("Connection disconnected")
+			}
 			return false
 		}
 		return true
