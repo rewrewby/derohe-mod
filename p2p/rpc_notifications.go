@@ -138,6 +138,10 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 	fill_common_T1(&request.Common)
 	c.update(&request.Common) // update common information
 
+	if c.ActiveTrace {
+		c.logger.Info("Incoming NotifyMiniBlock Request", "request", request)
+	}
+
 	var mbls []block.MiniBlock
 
 	for i := range request.MiniBlocks {
@@ -166,6 +170,8 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			time_to_receive := float64(globals.Time().UTC().UnixMicro()-request.Sent) / 1000000
 			metrics.Set.GetOrCreateHistogram("miniblock_propagation_duration_histogram_seconds").Update(time_to_receive)
 		}
+
+		go LogMiniblock(mbl, c.Addr.String(), request.Sent)
 
 		// first check whether it is already in the chain
 		if chain.MiniBlocks.IsCollision(mbl) {
@@ -206,12 +212,14 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 		}
 
 		if err, ok = chain.InsertMiniBlock(mbl); !ok {
+			if c.ActiveTrace {
+				c.logger.Info("Bad MiniBlock in NotifyMiniBlock Request", "err", err.Error())
+			}
 			go PeerLogReceiveFail(c.Addr.String(), "InsertMiniBlock", c.Peer_ID, err.Error())
 			// this happens all the time?
 			go LogReject(c.Addr.String())
 			return err
 		} else { // rebroadcast miniblock
-			go LogMiniblock(mbl, c.Addr.String())
 
 			chain.MiniBlocks.RLock()
 			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
@@ -237,6 +245,10 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 
 			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
 
+			if c.ActiveTrace {
+				c.logger.Info("Good MiniBlock in NotifyMiniBlock - Broadcasting")
+			}
+
 			globals.ForeignMiniFoundTime_lock.Lock()
 			defer globals.ForeignMiniFoundTime_lock.Unlock()
 			globals.ForeignMiniFoundTime[wallet] = append(globals.ForeignMiniFoundTime[wallet], time.Now().Unix())
@@ -245,7 +257,9 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 
 		}
 	}
-
+	if c.ActiveTrace {
+		c.logger.Info("Incoming NotifyMiniBlock Request", "response", response)
+	}
 	fill_common(&response.Common)                         // fill common info
 	fill_common_T0T1T2(&request.Common, &response.Common) // fill time related information
 	return nil

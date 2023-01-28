@@ -59,6 +59,7 @@ type MiniBlockLog struct {
 	NodeAddress string
 	MinerWallet string
 	IsOrphan    bool
+	SentTime    int64
 }
 
 var MiniblockLogs = make(map[string]MiniBlockLog)
@@ -707,7 +708,7 @@ func LogFinalBlock(bl block.Block, Address string) {
 
 var last_mining_time uint16
 
-func LogMiniblock(mbl block.MiniBlock, Address string) {
+func LogMiniblock(mbl block.MiniBlock, Address string, sent int64) {
 
 	log_miniblock_mutex.Lock()
 	defer log_miniblock_mutex.Unlock()
@@ -717,12 +718,13 @@ func LogMiniblock(mbl block.MiniBlock, Address string) {
 
 	stat, found := MiniblockLogs[MiniblockHash]
 
-	if !found {
+	if !found || stat.SentTime > sent {
 
 		MinerWallet := GetMinerAddressFromKeyHash(chain, mbl)
 		stat.MinerWallet = MinerWallet
 		stat.Miniblock = mbl
 		stat.NodeAddress = Address
+		stat.SentTime = sent
 
 		MiniblockLogs[MiniblockHash] = stat
 
