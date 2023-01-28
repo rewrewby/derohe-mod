@@ -113,13 +113,13 @@ func (connection *Connection) dispatch_test_handshake() {
 		return
 	}
 
-	if len(response.Tag) >= 1 && config.RunningConfig.TraceTagged {
-
+	if config.RunningConfig.TraceNewConnections {
 		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
 		direction := "Incoming"
 		if !connection.Incoming {
 			direction = "Outgoing"
 		}
+
 		host_string := fmt.Sprintf(red+"[ "+blue+" New %s Connection "+red+"]\t"+yellow+"%s\t"+green+"%s "+reset_color, direction, connection.Addr.String(), response.Tag)
 		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-80s"+reset_color, height_txt, host_string))
 	}

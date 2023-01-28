@@ -162,7 +162,7 @@ type RUN_CONFIG struct {
 	TraceTx                 bool
 	MinerMaintenanceMessage string
 	VariableDispatchTime    bool
-	TraceTagged             bool
+	TraceNewConnections     bool
 	MinerLatency            int
 	MaxTXRequest            int
 }
@@ -186,7 +186,7 @@ var RunningConfig = RUN_CONFIG{
 	AntiCheat:               true,
 	TraceBlocks:             true,
 	TraceTx:                 true,
-	TraceTagged:             true,
+	TraceNewConnections:     true,
 	MinerMaintenanceMessage: "System will go down for maintenance shortly",
 	MinerLatency:            100,
 	MaxTXRequest:            100,

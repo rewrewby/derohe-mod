@@ -1670,11 +1670,11 @@ restart_loop:
 					}
 				}
 
-				if line_parts[1] == "track_tagged" {
-					if config.RunningConfig.TraceTagged {
-						config.RunningConfig.TraceTagged = false
+				if line_parts[1] == "track_connections" {
+					if config.RunningConfig.TraceNewConnections {
+						config.RunningConfig.TraceNewConnections = false
 					} else {
-						config.RunningConfig.TraceTagged = true
+						config.RunningConfig.TraceNewConnections = true
 					}
 				}
 
