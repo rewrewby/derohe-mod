@@ -66,6 +66,7 @@ func (handshake *Handshake_Struct) Fill() {
 // all clients start with handshake, then other party sends avtive to mark that connection is active
 func (connection *Connection) dispatch_test_handshake() {
 	defer handle_connection_panic(connection)
+
 	var request, response Handshake_Struct
 	request.Fill()
 
@@ -73,18 +74,28 @@ func (connection *Connection) dispatch_test_handshake() {
 	request.Common.PeerList = get_peer_list_specific(Address(connection))
 
 	if connection.ActiveTrace {
-		connection.logger.Info("Outgoing Handshake Request", "Request", request)
+		connection.logger.Info("Outgoing Handshake Request", "request", request)
 	}
+
+	fail_count := 0
+retry_handshake:
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	if err := connection.Client.CallWithContext(ctx, "Peer.Handshake", request, &response); err != nil {
 		connection.logger = logger.WithName(connection.Addr.String())
 
-		if connection.ActiveTrace {
-			connection.logger.Error(err, "cannot handshake")
-			connection.logger.Info("Outgoing Handshake Request - Failed", "Response", response)
+		fail_count++
+		if fail_count <= 2 && err.Error() != "connection is shut down" {
+			connection.logger.V(4).Error(err, "retry handshake", "count", fail_count)
+			if connection.ActiveTrace {
+				connection.logger.Info("Outgoing Handshake Failed - Retrying", "count", fail_count)
+			}
+			goto retry_handshake
+		}
 
+		if connection.ActiveTrace {
+			connection.logger.Info("Outgoing Handshake Failed")
 		}
 
 		connection.logger.V(4).Error(err, "cannot handshake")
@@ -92,26 +103,27 @@ func (connection *Connection) dispatch_test_handshake() {
 		return
 	}
 
-	if connection.ActiveTrace {
-		connection.logger.Info("Outgoing Handshake Request", "Response", response)
-	}
-
 	if !Verify_Handshake(&response) { // if not same network boot off
 		if connection.ActiveTrace {
-			connection.logger.Info("Outgoing Handshake Request - Failed Verify", "Response", response)
+			connection.logger.Info("Outgoing Verify Handshake Failed")
+
 		}
 		connection.logger.V(3).Info("terminating connection network id mismatch ", "networkid", response.Network_ID)
 		connection.exit()
 		return
 	}
-	connection.update(&response.Common) // update common information
-	if !Connection_Add(connection) {    // add connection to pool
+	if !Connection_Add(connection) { // add connection to pool
 		if connection.ActiveTrace {
-			connection.logger.Info("Outgoing Handshake Request - Could not Add!", "Response", response)
+			connection.logger.Info("Outgoing Handshake - Not able to add connection")
 		}
 		connection.exit()
 		return
 	}
+	if connection.ActiveTrace {
+		connection.logger.Info("Outgoing Handshake Request", "response", response)
+	}
+
+	connection.update(&response.Common) // update common information
 
 	if config.RunningConfig.TraceNewConnections {
 		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())

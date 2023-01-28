@@ -126,20 +126,20 @@ var last_to_disconnect string // dedup output
 func (c *Connection) exit() {
 	defer globals.Recover(0)
 
-	if config.RunningConfig.TraceNewConnections && ParseIPNoError(c.Addr.String()) != last_to_disconnect && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
+	if config.RunningConfig.TraceNewConnections && c.Addr.String() != last_to_disconnect && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
 		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
 
 		connection_string := red + "[ " + blue + "Connection Disconnected " + red + "]"
 		host_string := fmt.Sprintf("%s", c.Addr.String())
 		tag_string := fmt.Sprintf("%s ", c.Tag)
 		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-44s "+yellow+"%-24s "+green+"%-22s"+reset_color, height_txt, connection_string, host_string, tag_string))
+		last_to_disconnect = c.Addr.String()
 	}
 
 	if c.ActiveTrace {
 		c.logger.Info("Connection disconnected")
 	}
 
-	last_to_disconnect = ParseIPNoError(c.Addr.String())
 	c.onceexit.Do(func() {
 		c.Client.Close()
 		c.ConnTls.Close()
@@ -273,9 +273,11 @@ func ping_loop() {
 					c.logger.Info("Outgoing Ping Request", "request", request)
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
 
+				fail_count := 0
+			retry_ping:
 				if err := c.Client.CallWithContext(ctx, "Peer.Ping", request, &response); err != nil {
 					// peer_log := globals.Logger.WithName("peer2").WithName(c.Addr.String())
 					// peer_log.V(2).Error(err, "ping failed")
@@ -283,6 +285,16 @@ func ping_loop() {
 					if c.ActiveTrace {
 						c.logger.V(0).Error(err, "ping failed")
 						c.logger.Info("Outgoing Ping Request Failed", "response", response)
+					}
+
+					fail_count++
+					if fail_count <= 2 && err.Error() != "connection is shut down" {
+						c.logger.V(4).Error(err, "retry ping failed", "count", fail_count)
+						if c.ActiveTrace {
+							c.logger.V(0).Error(err, "ping failed", "count", fail_count)
+							c.logger.Info("Retrying Ping Ping Request Failed", "count", fail_count)
+						}
+						goto retry_ping
 					}
 
 					c.exit()
