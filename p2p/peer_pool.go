@@ -145,16 +145,17 @@ func clean_up() {
 			v.FailCount = 0
 			continue
 		}
+
 		if v.FailCount >= 8 { // roughly 8 tries before we discard the peer
 			delete(peer_map, k)
 		}
-		if v.LastConnected == 0 { // if never connected, purge the peer
-			delete(peer_map, k)
-		}
+		// if v.LastConnected == 0 { // if never connected, purge the peer
+		// 	delete(peer_map, k)
+		// }
 
-		if uint64(time.Now().UTC().Unix()) > (v.LastConnected + 3600) { // purge all peers which were not connected in
-			delete(peer_map, k)
-		}
+		// if uint64(time.Now().UTC().Unix()) > (v.LastConnected + 3600) { // purge all peers which were not connected in
+		// 	delete(peer_map, k)
+		// }
 	}
 }
 

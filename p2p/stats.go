@@ -953,14 +953,14 @@ func PeerLogConnectionFail(Address string, Block_Type string, PeerID uint64, Mes
 		peer.Sending_Errors = stat
 	}
 
-	context_deadline := regexp.MustCompile("^context deadline exceeded")
-	// If errors showing connection error, then log this so peer can get cleaned up
-	connection_down := regexp.MustCompile("^connection is shut down")
-	closed_pipe := regexp.MustCompile("io: read/write on closed pipe")
+	// context_deadline := regexp.MustCompile("^context deadline exceeded")
+	// // If errors showing connection error, then log this so peer can get cleaned up
+	// connection_down := regexp.MustCompile("^connection is shut down")
+	// closed_pipe := regexp.MustCompile("io: read/write on closed pipe")
 
-	if connection_down.Match([]byte(Message)) || closed_pipe.Match([]byte(Message)) || context_deadline.Match([]byte(Message)) {
-		go Peer_SetFail(Address)
-	}
+	// if connection_down.Match([]byte(Message)) || closed_pipe.Match([]byte(Message)) || context_deadline.Match([]byte(Message)) {
+	// 	go Peer_SetFail(Address)
+	// }
 
 	Pstat[Address] = peer
 }
