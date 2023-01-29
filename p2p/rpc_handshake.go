@@ -71,7 +71,7 @@ func (connection *Connection) dispatch_test_handshake() {
 	request.Fill()
 
 	//scan our peer list and send peers which have been recently communicated
-	request.Common.PeerList = get_peer_list_specific(Address(connection))
+	request.PeerList = get_peer_list_specific(Address(connection))
 
 	if connection.ActiveTrace {
 		connection.logger.Info("Outgoing Handshake Request", "request", request)
