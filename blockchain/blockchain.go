@@ -36,6 +36,7 @@ import (
 	"github.com/go-logr/logr"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/sync/semaphore"
+	"golang.org/x/time/rate"
 
 	"github.com/deroproject/derohe/block"
 	"github.com/deroproject/derohe/blockchain/mempool"
@@ -1212,82 +1213,24 @@ func (chain *Blockchain) BlockCheckSum(cbl *block.Complete_Block) []byte {
 	return h.Sum(nil)
 }
 
-var RegBufferRunning bool
-var RegBuffer []*transaction.Transaction
-var regbuf_lock sync.Mutex
-var regbuf_height_count = make(map[int64]int)
-var max_registration_per_height = 100
-
-func (chain *Blockchain) RegPoolBufferSize() int {
-
-	regbuf_lock.Lock()
-	defer regbuf_lock.Unlock()
-	return len(RegBuffer)
-
-}
-
-func (chain *Blockchain) RegPoolBuffer(tx *transaction.Transaction) {
-
-	regbuf_lock.Lock()
-	RegBuffer = append(RegBuffer, tx)
-	regbuf_lock.Unlock()
-
-	if RegBufferRunning {
-		return
-	}
-
-	RegBufferRunning = true
-	height := chain.Get_Height()
-
-	block, err := chain.Load_Block_Topological_order_at_index(height)
-	if err != nil {
-		return
-	}
-	bl, err := chain.Load_BL_FROM_ID(block)
-	if err != nil {
-		return
-	}
-
-buffer_loop:
-	for chain.RegPoolBufferSize() >= 1 {
-		if regbuf_height_count[height] < max_registration_per_height {
-
-			var x *transaction.Transaction
-			regbuf_lock.Lock()
-			x, RegBuffer = RegBuffer[len(RegBuffer)-1], RegBuffer[:len(RegBuffer)-1]
-			regbuf_lock.Unlock()
-
-			for _, processed_tx := range bl.Tx_hashes {
-				hash := x.GetHash()
-				if hash == processed_tx {
-					logger.Info("Reg TX already processed, skipping", "tx", hash)
-					continue buffer_loop
-				}
-			}
-
-			if chain.Regpool.Regpool_Add_TX(x, 0) {
-				go LogTx(tx, chain.Get_Height())
-				regbuf_height_count[height]++
-			}
-		} else {
-			logger.Info("Registration TX overflow limit", "limit", max_registration_per_height)
-			time.Sleep(10 * time.Second)
-			height = chain.Get_Height()
-		}
-	}
-	RegBufferRunning = false
-}
-
 // this is the only entrypoint for new txs in the chain
 // add a transaction to MEMPOOL,
 // verifying everything  means everything possible
 // this only change mempool, no DB changes
+
+var regpool_accept_limit = rate.NewLimiter(5.0, 10) // 5 incoming per sec, burst of 10 is okay
+
 func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 	var err error
+
+	if !regpool_accept_limit.Allow() { // rate limiter
+		return fmt.Errorf("reg tx limit")
+	}
 
 	if tx.IsPremine() {
 		return fmt.Errorf("premine tx not mineable")
 	}
+
 	if tx.IsRegistration() { // registration tx will not go any forward
 
 		tx_hash := tx.GetHash()
@@ -1301,7 +1244,11 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 				if _, err := balance_tree.Get(tx.MinerAddress[:]); err == nil { // address already registered
 					return fmt.Errorf("address already registered")
 				} else { // add  to regpool
-					go chain.RegPoolBuffer(tx)
+					if chain.Regpool.Regpool_Add_TX(tx, 0) {
+						return nil
+					} else {
+						return fmt.Errorf("registration for address is already pending")
+					}
 				}
 			} else {
 				return err
@@ -1555,7 +1502,7 @@ func (chain *Blockchain) Rewind_Chain(rewind_count int) (result bool) {
 	}
 
 	// a pruned chain can only be rewinded upto it pruned height only
-	if chain.Load_TOPO_HEIGHT() - int64(rewind_count) <=  pruned_till {
+	if chain.Load_TOPO_HEIGHT()-int64(rewind_count) <= pruned_till {
 		return false
 	}
 

@@ -1129,7 +1129,6 @@ restart_loop:
 			fmt.Printf("Local time %s  (as per system clock) \n", time.Now())
 			fmt.Printf("Local time %s  (offset %s) (as per daemon) should be close to 0\n", globals.Time(), time.Now().Sub(globals.Time()))
 			fmt.Printf("Block Pop Count: %d\n\n", globals.BlockPopCount)
-			fmt.Printf("Reg TX Buffer Size: %d\n", chain.RegPoolBufferSize())
 
 			total_orphans := p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
 			network_loss := float64(0)
