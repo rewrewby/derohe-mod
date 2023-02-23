@@ -16,24 +16,22 @@
 
 package p2p
 
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
+	"math/big"
+	"math/bits"
+	"sync/atomic"
+	"time"
 
-//import "net"
-import "time"
-import "math/big"
-import "math/bits"
-import "sync/atomic"
-import "encoding/binary"
-
-import "github.com/deroproject/derohe/config"
-import "github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/derohe/cryptography/crypto" //import "net"
+	"github.com/deroproject/derohe/transaction"
+	"github.com/deroproject/graviton"
+)
 
 //import "github.com/deroproject/derohe/errormsg"
-import "github.com/deroproject/derohe/transaction"
-
-import "github.com/deroproject/graviton"
-
-import "github.com/deroproject/derohe/cryptography/crypto"
 
 //import "github.com/deroproject/derosuite/blockchain"
 
@@ -119,7 +117,7 @@ func (connection *Connection) bootstrap_chain() {
 
 				if len(ts_response.Keys) != len(ts_response.Values) {
 					//rlog.Warnf("Incoming Key count %d value count %d \"%s\" ", len(ts_response.Keys), len(ts_response.Values), globals.CTXString(connection.logger))
-					connection.exit()
+					connection.exit("Wrong key count")
 					return
 				}
 				//rlog.Debugf("chunk %d Will write %d keys\n", i, len(ts_response.Keys))
@@ -186,7 +184,7 @@ func (connection *Connection) bootstrap_chain() {
 
 				if len(ts_response.Keys) != len(ts_response.Values) {
 					//rlog.Warnf("Incoming Key count %d value count %d \"%s\" ", len(ts_response.Keys), len(ts_response.Values), globals.CTXString(connection.logger))
-					connection.exit()
+					connection.exit("Wrong key count")
 					return
 				}
 				//rlog.Debugf("SC chunk %d Will write %d keys\n", i, len(ts_response.Keys))
@@ -238,7 +236,7 @@ func (connection *Connection) bootstrap_chain() {
 
 									if len(sc_ts_response.Keys) != len(sc_ts_response.Values) {
 										connection.logger.V(1).Error(nil, "Wrong key/values", "Keycount", len(sc_ts_response.Keys), "valuecount", len(sc_ts_response.Values))
-										connection.exit()
+										connection.exit("Wrong key/values")
 										return
 									}
 									//fmt.Printf("writing SC chunk %d/%d (%d)  writing %d keys %x\n", k, sc_chunks, sc_response.KeyCount, len(sc_ts_response.Keys), ts_response.Keys[j])
@@ -285,7 +283,7 @@ func (connection *Connection) bootstrap_chain() {
 		err := bl.Deserialize(response.CBlocks[i].Block)
 		if err != nil { // we have a block which could not be deserialized ban peer
 			connection.logger.Error(err, "Error Incoming block could not be deserialised.")
-			connection.exit()
+			connection.exit("Error Incoming block could not be deserialised")
 			return
 		}
 
@@ -303,12 +301,12 @@ func (connection *Connection) bootstrap_chain() {
 			err = tx.Deserialize(response.CBlocks[i].Txs[j])
 			if err != nil { // we have a tx which could not be deserialized ban peer
 				connection.logger.Error(err, "Error Incoming TX could not be deserialized")
-				connection.exit()
+				connection.exit("Error Incoming block could not be deserialised")
 				return
 			}
 			if bl.Tx_hashes[j] != tx.GetHash() {
 				connection.logger.Error(err, "Error Incoming TX has mismatch.")
-				connection.exit()
+				connection.exit("Error Incoming TX has mismatch")
 				return
 			}
 
@@ -326,7 +324,7 @@ func (connection *Connection) bootstrap_chain() {
 		diff := new(big.Int)
 		if _, ok := diff.SetString(response.CBlocks[i].Difficulty, 10); !ok { // if Cumulative_Difficulty could not be parsed, kill connection
 			connection.logger.Error(fmt.Errorf("Could not Parse Difficulty in common"), "", "diff", response.CBlocks[i].Difficulty)
-			connection.exit()
+			connection.exit("Could not Parse Difficulty in common")
 			return
 		}
 

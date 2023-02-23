@@ -110,7 +110,7 @@ func (c *Connection) NotifyINV(request ObjectList, response *Dummy) (err error) 
 		if err = c.Client.CallWithContext(ctx, "Peer.GetObject", need, &oresponse); err != nil {
 			c.logger = logger.WithName(c.Addr.String())
 			c.logger.V(2).Error(err, "Call failed GetObject", "need_objects", need)
-			c.exit()
+			c.exit("Call failed GetObject")
 			return
 		} else { // process the response
 			if err = c.process_object_response(oresponse, request.Sent, false); err != nil {
@@ -129,10 +129,14 @@ func (c *Connection) NotifyINV(request ObjectList, response *Dummy) (err error) 
 // only miniblocks carry extra info, which leads to better time tracking
 func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err error) {
 	defer handle_connection_panic(c)
+
+	// for saving time we got the block
+	request_time := globals.Time().UTC().UnixMicro()
+
 	if len(request.MiniBlocks) >= 5 {
 		err = fmt.Errorf("Notify Block can notify max 5 miniblocks")
 		c.logger.V(3).Error(err, "Should be banned")
-		c.exit()
+		c.exit("Should be banned")
 		return err
 	}
 	fill_common_T1(&request.Common)
@@ -174,7 +178,7 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			metrics.Set.GetOrCreateHistogram("miniblock_propagation_duration_histogram_seconds").Update(time_to_receive)
 		}
 
-		go LogMiniblock(mbl, c.Addr.String(), request.Sent)
+		go LogMiniblock(mbl, c.Addr.String(), request_time)
 
 		// first check whether it is already in the chain
 		if chain.MiniBlocks.IsCollision(mbl) {
@@ -278,12 +282,11 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 	err = bl.Deserialize(request.CBlocks[0].Block)
 	if err != nil { // we have a block which could not be deserialized ban peer
 		c.logger.V(3).Error(err, "Block cannot be deserialized.Should be banned")
-		c.exit()
+		c.exit("Block cannot be deserialized.Should be banned")
 		return err
 	}
 
 	blid := bl.GetHash()
-	go LogFinalBlock(bl, c.Addr.String())
 	atomic.AddUint64(&c.BytesIn, 1)
 
 	// object is already is in our chain, we need not relay it
@@ -299,7 +302,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 			err = tx.Deserialize(request.CBlocks[0].Txs[j])
 			if err != nil { // we have a tx which could not be deserialized ban peer
 				c.logger.Error(err, "tx cannot be deserialized.Should be banned")
-				c.exit()
+				c.exit("tx cannot be deserialized.Should be banned")
 				return err
 			}
 			cbl.Txs = append(cbl.Txs, &tx)
@@ -315,6 +318,8 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 	if err, ok := chain.Add_Complete_Block(&cbl); ok { // if block addition was successfil
 		// notify all peers
 		Broadcast_Block(&cbl, c.Peer_ID) // do not send back to the original peer
+
+		go LogFinalBlock(bl, c.Addr.String(), globals.Time().UTC().UnixMicro())
 		go LogAccept(c.Addr.String())
 
 		wallet := GetIntegratorAddressFromKeyHash(chain, bl)
@@ -342,7 +347,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 		go LogReject(c.Addr.String())
 		if err == errormsg.ErrInvalidPoW {
 			c.logger.Error(err, "This peer should be banned and terminated")
-			c.exit()
+			c.exit("This peer should be banned and terminated")
 			return err
 		}
 	}

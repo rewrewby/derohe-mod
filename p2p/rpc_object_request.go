@@ -30,13 +30,13 @@ func (connection *Connection) GetObject(request ObjectList, response *Objects) e
 	var err error
 	if len(request.Block_list) < 1 && len(request.Tx_list) < 1 && len(request.Chunk_list) < 1 { // we are expecting 1 block or 1 tx
 		connection.logger.V(2).Info("malformed object request  received, banning peer", "request", request)
-		connection.exit()
+		connection.exit("malformed object request")
 		return nil
 	}
 
 	if len(request.Tx_list) > config.RunningConfig.MaxTXRequest {
 		connection.logger.V(0).Info("Too many TX in Request received, banning peer", "request", request)
-		connection.exit()
+		connection.exit("Too many TX in Request received, should ban peer")
 		return nil
 	}
 

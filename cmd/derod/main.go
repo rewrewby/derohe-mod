@@ -404,6 +404,8 @@ func main() {
 	globals.Cron.Start() // start cron jobs
 
 	globals.Cron.AddFunc("@every 10s", p2p.UpdateLiveBlockData)
+	globals.Cron.AddFunc("@every 3s", p2p.CleanUpTrusted)
+	globals.Cron.AddFunc("@every 1m", p2p.SaveTrustList)
 
 	globals.Cron.AddFunc("@every 60s", globals.CleanupForeignMiniCounter)
 
@@ -1445,13 +1447,10 @@ restart_loop:
 			if len(line_parts) == 2 {
 
 				active_miners := p2p.GetActiveMinersFromHeight(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount)
-				height := chain.Get_Height()
-				keep_blocks := config.RunningConfig.NetworkStatsKeepCount
-				keep_string := fmt.Sprintf("Last %d Blocks", config.RunningConfig.NetworkStatsKeepCount)
-				if (height - globals.BlockChainStartHeight) < config.RunningConfig.NetworkStatsKeepCount {
-					keep_blocks = height - globals.BlockChainStartHeight
-					keep_string = fmt.Sprintf("Last %d/%d Blocks", keep_blocks, config.RunningConfig.NetworkStatsKeepCount)
-				}
+
+				blocks_from_count := p2p.HasBlocksFromCount()
+				keep_string := fmt.Sprintf("Last %d/%d Blocks", blocks_from_count, config.RunningConfig.NetworkStatsKeepCount)
+
 				fmt.Printf("Network Mining Stats Since %s\n\n", keep_string)
 				for miner, _ := range active_miners {
 					if miner != line_parts[1] {
@@ -1459,7 +1458,7 @@ restart_loop:
 					}
 
 					fmt.Printf("%-76s %-16s %-16s %-16s %-24s\n", "Miner", "IB", "MB", "MBO", "Dominance")
-					dominance := fmt.Sprintf("%.02f%%", (float64(active_miners[miner]["total"]) / (10 * float64(keep_blocks)) * 100))
+					dominance := fmt.Sprintf("%.02f%%", (float64(active_miners[miner]["total"]) / (10 * float64(blocks_from_count)) * 100))
 
 					orphan_loss := float64(float64(active_miners[miner]["orphans"]) / float64(active_miners[miner]["total"]) * 100)
 					orphan_string := fmt.Sprintf("%.2f%%", orphan_loss)
@@ -1469,9 +1468,10 @@ restart_loop:
 					ordered_nodes, data := p2p.PotentialMinerNodeHeight((chain.Get_Height() - 100), miner)
 					fmt.Print("\nPotential Miner Nodes:\n")
 					fmt.Printf("%-24s %-8s %-8s %-8s %-14s %-16s\n", "Node", "IB", "MB", "MBO", "Orphan Loss", "Probability")
-
 					for _, node := range ordered_nodes {
-						fmt.Printf("%-24s %-8d %-8d %-8d %-14s %.2f%%\n", node, int(data[node]["finals"]), int(data[node]["minis"]), int(data[node]["orphans"]), orphan_string, data[node]["likelyhood"])
+						tag := p2p.GetModPeerTag(node)
+
+						fmt.Printf("%-24s %-8d %-8d %-8d %-14s %-14s %-8s\n", node, int(data[node].TotalFinals), int(data[node].TotalMinis), data[node].IBOs+data[node].MBOs, orphan_string, fmt.Sprintf("%.2f%%", data[node].LikeHoodScore), tag)
 					}
 
 				}

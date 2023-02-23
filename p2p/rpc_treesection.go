@@ -23,7 +23,7 @@ func (c *Connection) TreeSection(request Request_Tree_Section_Struct, response *
 	defer handle_connection_panic(c)
 	if request.Topo < 2 || request.SectionLength > 256 || len(request.Section) < int(request.SectionLength/8) { // we are expecting 1 block or 1 tx
 		c.logger.V(1).Info("malformed object request  received, banning peer", "request", request)
-		c.exit()
+		c.exit("malformed object request")
 	}
 
 	c.update(&request.Common) // update common information

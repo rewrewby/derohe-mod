@@ -18,6 +18,44 @@ import (
 var trusted_map = make(map[string]int64)
 var trust_mutex sync.Mutex
 
+func GetTrustedMap() map[string]int64 {
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
+
+	var mymap = make(map[string]int64)
+
+	for key, value := range trusted_map {
+		mymap[key] = value
+	}
+
+	return mymap
+
+}
+
+func CleanUpTrusted() {
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
+
+	all_connections := UniqueConnections()
+
+	for _, c := range all_connections {
+		ConnAddr := c.Addr.String()
+		for Addr, _ := range trusted_map {
+			if ParseIPNoError(ConnAddr) == ParseIPNoError(Addr) {
+				if !c.Incoming && Addr != ConnAddr {
+					logger.V(5).Info(fmt.Sprintf("Updating trusted map %s -> %s", Addr, ConnAddr))
+					trusted_map[ConnAddr] = trusted_map[Addr]
+					delete(trusted_map, Addr)
+				}
+			}
+
+		}
+	}
+
+}
+
 func IsSyncNode(Addr string) bool {
 
 	Address := ParseIPNoError(Addr)
@@ -34,47 +72,19 @@ func IsSyncNode(Addr string) bool {
 	return false
 }
 
-func GetTrustedMap() map[string]int64 {
-
-	trust_mutex.Lock()
-	defer trust_mutex.Unlock()
-
-	var mymap = make(map[string]int64)
-
-	for key, value := range trusted_map {
-		mymap[key] = value
-	}
-
-	return mymap
-
-}
-
 func IsTrustedIP(Addr string) bool {
-
-	trust_mutex.Lock()
-	defer trust_mutex.Unlock()
 
 	Address := ParseIPNoError(Addr)
 
-	for _, ip := range config.Mainnet_seed_nodes {
-		if Address == ParseIPNoError(ip) {
-			return true
-		}
+	if IsSyncNode(Addr) {
+		return true
 	}
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
 
 	for ip, _ := range trusted_map {
 		if Address == ParseIPNoError(ip) {
-			if Addr != ip {
-
-				_, _, err := net.SplitHostPort(Addr)
-				if err == nil {
-					logger.V(2).Info(fmt.Sprintf("Updating trusted map %s -> %s", ip, Addr))
-					trusted_map[Addr] = trusted_map[ip]
-					delete(trusted_map, ip)
-					// go save_trust_list()
-				}
-
-			}
 			return true
 		}
 	}
@@ -86,9 +96,6 @@ func IsTrustedIP(Addr string) bool {
 
 // loads peers list from disk
 func LoadTrustedList() {
-
-	peer_mutex.Lock()
-	defer peer_mutex.Unlock()
 
 	trust_mutex.Lock()
 	defer trust_mutex.Unlock()
@@ -182,8 +189,8 @@ func Del_Trusted(Address string) {
 	defer trust_mutex.Unlock()
 
 	for ip, _ := range trusted_map {
-		if ip == ParseIPNoError(Address) {
-			delete(trusted_map, ParseIPNoError(ip))
+		if ParseIPNoError(ip) == ParseIPNoError(Address) {
+			delete(trusted_map, ip)
 			logger.Info(fmt.Sprintf("Address: %s - Removed from Trusted List", ip))
 		}
 	}
@@ -191,7 +198,7 @@ func Del_Trusted(Address string) {
 	for _, c := range UniqueConnections() {
 		tag_match := regexp.MustCompile(Address)
 		if tag_match.Match([]byte(c.Tag)) {
-			delete(trusted_map, ParseIPNoError(c.Addr.String()))
+			delete(trusted_map, c.Addr.String())
 			logger.Info(fmt.Sprintf("Address: %s (%s) - Removed from Trusted List", c.Addr.String(), c.Tag))
 		}
 	}
@@ -229,14 +236,20 @@ func Print_Trusted_Peers() {
 	}
 	fmt.Printf("\n")
 
-	fmt.Printf("%-22s %-32s %-10s %-23s %-8s %-22s\n", "Address", "Added", "Connected", "Version", "Height", "Tag")
+	fmt.Printf("%-22s %-8s %-22s %-23s %-8s %-8s %-22s\n", "Address", "Port", "Connected", "Version", "Height", "Modded", "Tag")
 
 	trust_mutex.Lock()
 	defer trust_mutex.Unlock()
-	for Address, added := range trusted_map {
+	for Address, _ := range trusted_map {
 
 		found := false
-		ip := ParseIPNoError(Address)
+		port := "0"
+		ip, port, err := net.SplitHostPort(Address)
+		if err != nil {
+			port = "0"
+			ip = ParseIPNoError(Address)
+		}
+
 		for _, conn := range unique_map {
 			if ParseIPNoError(conn.Addr.String()) == ip {
 				found = true
@@ -246,20 +259,44 @@ func Print_Trusted_Peers() {
 					version = version[:20]
 				}
 
-				fmt.Printf("%-22s %-32s %-10s %-23s %-8d %-22s\n", Address, time.Unix(added, 0).Format(time.RFC1123), "Yes", version, conn.Height, conn.Tag)
+				modded := "NO"
+				if conn.Hansen33Mod {
+					modded = "YES"
+				}
+
+				state := ""
+				if conn.SyncNode {
+					state = "(Seed)"
+				}
+				is_connected := fmt.Sprintf("%s %s", time.Now().Sub(conn.Created).Round(time.Millisecond).String(), state)
+
+				fmt.Printf("%-22s %-8s %-22s %-23s %-8d %-8s %-22s\n", ip, port, is_connected, version, conn.Height, modded, conn.Tag)
 				break
 			}
 
 		}
 
 		if !found {
-			fmt.Printf("%-22s %-32s %-10s\n", Address, time.Unix(added, 0).Format(time.RFC1123), "No")
+			fmt.Printf("%-22s %-8s %-22s\n", ip, port, "No")
 		}
 
 	}
 
 	fmt.Printf("\n")
 
+}
+
+func DisconnectSeedNodes() {
+
+	unique_map := UniqueConnections()
+	for _, conn := range unique_map {
+		if conn.SyncNode || IsSyncNode(conn.Addr.String()) {
+			logger.V(1).Info(fmt.Sprintf("Disconnecting Seed Node: %s", conn.Addr.String()))
+			conn.Client.Close()
+			conn.Conn.Close()
+			Connection_Delete(conn)
+		}
+	}
 }
 
 func Only_Trusted_Peers() {
@@ -273,7 +310,4 @@ func Only_Trusted_Peers() {
 			Connection_Delete(conn)
 		}
 	}
-
-	fmt.Printf("\n")
-
 }

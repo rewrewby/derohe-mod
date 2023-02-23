@@ -77,29 +77,22 @@ func (connection *Connection) dispatch_test_handshake() {
 		connection.logger.Info("Outgoing Handshake Request", "request", request)
 	}
 
-	fail_count := 0
-retry_handshake:
-
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	timeout := 10
+	if IsTrustedIP(connection.Addr.String()) {
+		timeout = 30
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
-	if err := connection.Client.CallWithContext(ctx, "Peer.Handshake", request, &response); err != nil {
-		connection.logger = logger.WithName(connection.Addr.String())
 
-		fail_count++
-		if fail_count <= 2 && err.Error() != "connection is shut down" {
-			connection.logger.V(4).Error(err, "retry handshake", "count", fail_count)
-			if connection.ActiveTrace {
-				connection.logger.Info("Outgoing Handshake Failed - Retrying", "count", fail_count)
-			}
-			goto retry_handshake
-		}
+	if err := connection.Client.CallWithContext(ctx, "Peer.Handshake", request, &response); err != nil {
+
+		err = fmt.Errorf("%s", err.Error())
 
 		if connection.ActiveTrace {
-			connection.logger.Info("Outgoing Handshake Failed")
+			connection.logger.Error(err, "Outgoing Handshake Failed")
 		}
-
-		connection.logger.V(4).Error(err, "cannot handshake")
-		connection.exit()
+		// connection.logger.V(3).Error(err, "cannot handshake", "error", err.Error())
+		connection.exit(fmt.Sprintf("Outgoing Handshake Failed: %s", err.Error()))
 		return
 	}
 
@@ -109,14 +102,14 @@ retry_handshake:
 
 		}
 		connection.logger.V(3).Info("terminating connection network id mismatch ", "networkid", response.Network_ID)
-		connection.exit()
+		connection.exit("terminating connection network id mismatch")
 		return
 	}
 	if !Connection_Add(connection) { // add connection to pool
 		if connection.ActiveTrace {
 			connection.logger.Info("Outgoing Handshake - Not able to add connection")
 		}
-		connection.exit()
+		connection.exit("Can't add connection")
 		return
 	}
 	if connection.ActiveTrace {
@@ -214,13 +207,13 @@ func (c *Connection) Handshake(request Handshake_Struct, response *Handshake_Str
 	defer handle_connection_panic(c)
 	if request.Peer_ID == GetPeerID() { // check if self connection exit
 		//rlog.Tracef(1, "Same peer ID, probably self connection, disconnecting from this client")
-		c.exit()
+		c.exit("Same peer ID")
 		return fmt.Errorf("Same peer ID")
 	}
 
 	if !Verify_Handshake(&request) { // if not same network boot off
 		logger.V(2).Info("kill connection network id mismatch peer network id.", "Network_ID", request.Network_ID)
-		c.exit()
+		c.exit("NID mismatch")
 		return fmt.Errorf("NID mismatch")
 	}
 

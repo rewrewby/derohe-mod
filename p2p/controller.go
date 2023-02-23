@@ -547,7 +547,7 @@ func P2P_Server_v2() {
 		in, out := Peer_Direction_Count()
 
 		if int64(in+out) > Max_Peers { // do not allow incoming ddos
-			connection.exit()
+			connection.exit("Already at maximum peers")
 			return
 		}
 
@@ -639,7 +639,7 @@ func handle_connection_panic(c *Connection) {
 	defer globals.Recover(2)
 	if r := recover(); r != nil {
 		logger.V(2).Error(nil, "Recovered while handling connection", "r", r, "stack", string(debug.Stack()))
-		c.exit()
+		c.exit("Connection panic")
 	}
 }
 
@@ -701,7 +701,7 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 	client := rpc2.NewClientWithCodec(NewCBORCodec(tlsconn))
 
 	c := &Connection{Client: client, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: incoming, SyncNode: sync_node, Trusted: IsTrustedIP(remote_addr.String()), ActiveTrace: IsPeerTraced(remote_addr.String())}
-	defer c.exit()
+	defer c.exit("Process Outgoing Connection")
 	new_logger := logger.WithName("OUT").WithName(remote_addr.String())
 	c.logger = new_logger
 	set_handlers(client)

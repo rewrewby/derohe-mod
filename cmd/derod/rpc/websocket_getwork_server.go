@@ -147,69 +147,6 @@ var red string = "\033[31m"        // make prompt red
 var blue string = "\033[34m"       // blue color
 var reset_color string = "\033[0m" // reset color
 
-func ShowMinerInfo(wallet string) {
-
-	// UpdateMinerStats()
-
-	// fmt.Print("Local Miner Info\n\n")
-
-	// miner_stats_mutex.Lock()
-	// defer miner_stats_mutex.Unlock()
-
-	// count := 0
-	// for ip_address, stat := range miner_stats {
-
-	// 	if stat.address != wallet && ParseIPNoError(wallet) != ParseIPNoError(ip_address) {
-	// 		continue
-	// 	}
-
-	// 	if count == 0 {
-	// 		fmt.Printf("Miner Wallet: %s\n\n", stat.address)
-	// 		fmt.Printf("%-32s %-12s %-12s %-12s %-12s %-12s %-12s %-12s %-12s\n\n", "IP Address", "Tag", "Connected", "Hashrate", "Blocks", "Mini Blocks", "Rejected", "Orphan", "Success Rate")
-	// 	}
-	// 	count++
-
-	// 	is_connected := "no"
-	// miners_connected := uint64(0)
-
-	// if stat.is_connected {
-	// 	is_connected = "yes"
-	// 	miners_connected++
-	// }
-
-	// total_blocks := float64(stat.blocks + stat.miniblocks + stat.rejected)
-	// bad_blocks := float64(stat.rejected + stat.orphaned)
-
-	// success_rate := float64(100)
-
-	// if bad_blocks >= 1 && total_blocks >= 1 {
-	// 	success_rate = float64(100 - (float64(bad_blocks/total_blocks) * 100))
-	// } else if bad_blocks >= 1 {
-	// 	success_rate = float64(0)
-	// }
-	// hash_rate_string := ""
-
-	// switch {
-	// case stat.hashrate > 1000000000000:
-	// 	hash_rate_string = fmt.Sprintf("%.3f TH/s", float64(stat.hashrate)/1000000000000.0)
-	// case stat.hashrate > 1000000000:
-	// 	hash_rate_string = fmt.Sprintf("%.3f GH/s", float64(stat.hashrate)/1000000000.0)
-	// case stat.hashrate > 1000000:
-	// 	hash_rate_string = fmt.Sprintf("%.3f MH/s", float64(stat.hashrate)/1000000.0)
-	// case stat.hashrate > 1000:
-	// 	hash_rate_string = fmt.Sprintf("%.3f KH/s", float64(stat.hashrate)/1000.0)
-	// case stat.hashrate > 0:
-	// 	hash_rate_string = fmt.Sprintf("%d H/s", int(stat.hashrate))
-	// }
-
-	// fmt.Printf("%-32s %-12s %-12s %-12s %-12d %-12d %-12d %-12d %.2f\n", ip_address, stat.tag, is_connected, hash_rate_string, stat.blocks, stat.miniblocks, stat.rejected, stat.orphaned, success_rate)
-
-	// }
-
-	// fmt.Print("\n")
-
-}
-
 func ListMiners() {
 
 	miner_stats := GetAllMinerStats()

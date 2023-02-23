@@ -112,6 +112,11 @@ type Connection struct {
 
 func ConnecToNode(address string) {
 
+	// reset backoff so we can connect straight away
+	backoff_mutex.Lock()
+	backoff[ParseIPNoError(address)] = 0
+	backoff_mutex.Unlock()
+
 	go connect_with_endpoint(address, false)
 }
 
@@ -122,8 +127,21 @@ func Address(c *Connection) string {
 	return ParseIPNoError(c.Addr.String())
 }
 
-func (c *Connection) exit() {
+var last_to_disconnect string // dedup output
+
+func (c *Connection) exit(reason string) {
 	defer globals.Recover(0)
+
+	if config.RunningConfig.TraceNewConnections && last_to_disconnect != c.Addr.String() && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
+		last_to_disconnect = c.Addr.String()
+
+		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+
+		connection_string := red + "[ " + yellow + "Connection Lost " + red + "]"
+		host_string := fmt.Sprintf("%s", c.Addr.String())
+
+		globals.Console_Only_Logger.Info(fmt.Sprintf("%-35s %-40s "+red+"%-24s "+red+"("+blue+" %s "+red+")"+reset_color, height_txt, connection_string, host_string, reason))
+	}
 
 	c.onceexit.Do(func() {
 		c.Client.Close()
@@ -131,10 +149,7 @@ func (c *Connection) exit() {
 		c.Conn.Close()
 
 	})
-
 }
-
-var last_to_disconnect string // dedup output
 
 // add connection to  map
 func Connection_Delete(c *Connection) {
@@ -144,18 +159,9 @@ func Connection_Delete(c *Connection) {
 
 		// Clear all connection to same IP
 		if c.Addr.String() == v.Addr.String() {
-			c.exit()
+			v.exit("Delete connection")
 			// if ParseIPNoError(c.Addr.String()) == ParseIPNoError(v.Addr.String()) {
 			connection_map.Delete(Address(v))
-			if config.RunningConfig.TraceNewConnections && c.Addr.String() != last_to_disconnect && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
-				height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
-
-				connection_string := red + "[ " + blue + "Connection Disconnected " + red + "]"
-				host_string := fmt.Sprintf("%s", c.Addr.String())
-				tag_string := fmt.Sprintf("%s ", c.Tag)
-				globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-44s "+yellow+"%-24s "+green+"%-22s"+reset_color, height_txt, connection_string, host_string, tag_string))
-				last_to_disconnect = c.Addr.String()
-			}
 
 			if c.ActiveTrace {
 				c.logger.Info("Connection disconnected")
@@ -172,19 +178,19 @@ func Connection_Pending_Clear() {
 	connection_map.Range(func(k, value interface{}) bool {
 		v := value.(*Connection)
 		if atomic.LoadUint32(&v.State) == HANDSHAKE_PENDING && time.Now().Sub(v.Created) > 10*time.Second { //and skip ourselves
-			v.exit()
+			v.exit("Cleaning pending connection")
 			v.logger.V(3).Info("Cleaning pending connection")
 		}
 
 		if time.Now().Sub(v.update_received).Round(time.Second).Seconds() > 20 && pending_clear_count < 10 {
-			v.exit()
+			v.exit("Cleaning pending connection")
 			go Connection_Delete(v)
 			v.logger.V(1).Info(fmt.Sprintf("Purging connection (%s) since idle for %s", v.Addr.String(), time.Now().Sub(v.update_received).Round(time.Second).String()))
 			pending_clear_count++
 		}
 
 		if IsAddressInBanList(Address(v)) {
-			v.exit()
+			v.exit("Cleaning pending connection")
 			go Connection_Delete(v)
 			v.logger.V(1).Info("Purging connection due to ban list")
 		}
@@ -227,7 +233,7 @@ func Connection_Add(c *Connection) bool {
 		return true
 	} else {
 		c.logger.V(3).Info("IP address already has one connection, exiting this connection", "ip", c.Addr.String(), "pre", dup.(*Connection).Addr.String())
-		c.exit()
+		c.exit("IP address already connected")
 		return false
 	}
 }
@@ -276,28 +282,21 @@ func ping_loop() {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
 
-				fail_count := 0
-			retry_ping:
 				if err := c.Client.CallWithContext(ctx, "Peer.Ping", request, &response); err != nil {
-					// peer_log := globals.Logger.WithName("peer2").WithName(c.Addr.String())
-					// peer_log.V(2).Error(err, "ping failed")
-					c.logger.V(4).Error(err, "ping failed")
+
+					err = fmt.Errorf("%s", err.Error())
+
 					if c.ActiveTrace {
-						c.logger.V(0).Error(err, "ping failed")
-						c.logger.Info("Outgoing Ping Request Failed", "response", response)
+						c.logger.Info("OUT-REQ: Ping Failed", "err", err.Error())
 					}
 
-					fail_count++
-					if fail_count <= 2 && err.Error() != "connection is shut down" {
-						c.logger.V(4).Error(err, "retry ping failed", "count", fail_count)
-						if c.ActiveTrace {
-							c.logger.V(0).Error(err, "ping failed", "count", fail_count)
-							c.logger.Info("Retrying Ping Ping Request Failed", "count", fail_count)
-						}
-						goto retry_ping
+					if err.Error() == "context deadline exceeded" || err.Error() == "timeout" {
+						return
 					}
 
-					c.exit()
+					c.exit("Ping Failed")
+					go Connection_Delete(c)
+
 					return
 				}
 				c.update(&response.Common) // update common information
@@ -466,6 +465,10 @@ func broadcast_Block_Coded(cbl *block.Complete_Block, PeerID uint64, first_seen 
 	/*if IsSyncing() { // if we are syncing, do NOT broadcast the block
 		return
 	}*/
+
+	if peerid == 0 {
+		go LogFinalBlock(*cbl.Bl, "127.0.0.1", globals.Time().UTC().UnixMicro())
+	}
 
 	blid := cbl.Bl.GetHash()
 

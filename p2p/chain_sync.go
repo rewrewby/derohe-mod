@@ -340,7 +340,7 @@ func (connection *Connection) process_object_response(response Objects, sent int
 		err := bl.Deserialize(response.CBlocks[i].Block)
 		if err != nil { // we have a block which could not be deserialized ban peer
 			connection.logger.V(2).Error(err, "Incoming block could not be deserilised")
-			connection.exit()
+			connection.exit("Incoming block could not be deserilised")
 			if syncing {
 				return nil
 			} else {
@@ -357,7 +357,6 @@ func (connection *Connection) process_object_response(response Objects, sent int
 		}
 		// check whether the object was requested one
 
-		go LogFinalBlock(bl, connection.Addr.String())
 		atomic.AddUint64(&connection.BytesIn, 1)
 
 		// complete the txs
@@ -366,7 +365,7 @@ func (connection *Connection) process_object_response(response Objects, sent int
 			err = tx.Deserialize(response.CBlocks[i].Txs[j])
 			if err != nil { // we have a tx which could not be deserialized ban peer
 				connection.logger.V(2).Error(err, "Incoming TX could not be deserilised")
-				connection.exit()
+				connection.exit("Incoming TX could not be deserilised")
 
 				if syncing {
 					return nil
@@ -381,7 +380,7 @@ func (connection *Connection) process_object_response(response Objects, sent int
 		err, ok := chain.Add_Complete_Block(&cbl)
 		if !ok && err == errormsg.ErrInvalidPoW {
 			connection.logger.V(-1).Error(err, "This peer should be banned")
-			connection.exit()
+			connection.exit("This peer should be banned")
 			if syncing {
 				return nil
 			} else {
@@ -417,7 +416,7 @@ func (connection *Connection) process_object_response(response Objects, sent int
 		err = tx.Deserialize(response.Txs[i])
 		if err != nil { // we have a tx which could not be deserialized ban peer
 			connection.logger.V(2).Error(err, "Incoming TX could not be deserilised")
-			connection.exit()
+			connection.exit("Incoming TX could not be deserilised")
 
 			return nil
 		}
