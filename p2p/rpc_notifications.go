@@ -144,6 +144,7 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 
 	var mbls []block.MiniBlock
 
+	height := uint64(chain.Get_Height())
 	for i := range request.MiniBlocks {
 		var mbl block.MiniBlock
 		if err = mbl.Deserialize(request.MiniBlocks[i]); err != nil {
@@ -151,8 +152,10 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 		}
 
 		// MiniBlock Spam Prevention
-		if mbl.Height >= uint64(chain.Get_Height()-1) {
+		if mbl.Height >= height-1 {
 			mbls = append(mbls, mbl)
+		} else {
+			return fmt.Errorf("Stale Miniblock")
 		}
 
 		atomic.AddUint64(&c.BytesIn, 1)
