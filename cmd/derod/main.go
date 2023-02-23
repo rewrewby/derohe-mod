@@ -327,6 +327,35 @@ func main() {
 
 	go derodrpc.Getwork_server()
 
+	mod_logger := globals.Logger.WithName("MODDED")
+	go func() {
+		// paint some nice start up animation
+		time.Sleep(100 * time.Millisecond)
+		mod_logger.Info("")
+		time.Sleep(100 * time.Millisecond)
+
+		lines := strings.Split(strings.ReplaceAll(stargate_text, "\r\n", "\n"), "\n")
+		for _, line := range lines {
+			mod_logger.Info(green + line + reset_color)
+			time.Sleep(100 * time.Millisecond)
+		}
+		time.Sleep(100 * time.Millisecond)
+		mod_logger.Info(yellow + "Version: " + green + config.Version.String())
+
+		lines = strings.Split(strings.ReplaceAll(mod_graphic_hansenmod3, "\r\n", "\n"), "\n")
+		for _, line := range lines {
+			mod_logger.Info(blue + line + reset_color)
+			time.Sleep(100 * time.Millisecond)
+		}
+		if chain.Get_Height() == 0 {
+			mod_logger.Info(red + "Waiting for bootstrap to start ... " + reset_color)
+		} else {
+			mod_logger.Info(green + "Initialising ... " + reset_color)
+		}
+		mod_logger.Info("")
+
+	}()
+
 	// setup function pointers
 	chain.P2P_Block_Relayer = func(cbl *block.Complete_Block, peerid uint64) {
 		p2p.Broadcast_Block(cbl, peerid)
@@ -2093,6 +2122,34 @@ restart_loop:
 		case line == "sleep":
 			logger.Info("console sleeping for 1 second")
 			time.Sleep(1 * time.Second)
+
+		case command == "ping":
+
+			if len(line_parts) == 2 {
+
+				option := line_parts[1]
+
+				switch option {
+				case "seed":
+					go p2p.PingOption("seeds")
+
+				case "seeds":
+					go p2p.PingOption("seeds")
+
+				case "all":
+					go p2p.PingOption("all")
+
+				case "trusted":
+					go p2p.PingOption("trusted")
+
+				default:
+					go p2p.PingNode(option)
+				}
+
+			} else {
+				fmt.Printf("usage: ping [<ip>|all|seeds|trusted]\n")
+			}
+
 		case line == "":
 		default:
 			logger.Info(fmt.Sprintf("you said: %s", strconv.Quote(line)))
@@ -2260,9 +2317,12 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mshow_selfish\033[0m\tShow Nodes that don't play nice\n")
 	io.WriteString(w, "\t\033[1mtrace_peer <ip>\033[0m\tTrace Peer Communication\n")
 
+	io.WriteString(w, fmt.Sprintf(blue+"%-28s "+yellow+"%-38s\n"+reset_color, "ping [<ip>|all|seeds|trusted]", "ping peer(s)"))
+
 }
 
 var completer = readline.NewPrefixCompleter(
+	readline.PcItem("ping"),
 	readline.PcItem("help"),
 	readline.PcItem("diff"),
 	readline.PcItem("gc"),

@@ -536,7 +536,8 @@ func P2P_Server_v2() {
 		tlsconn := tlsconn_interface.(net.Conn)
 
 		connection := &Connection{Client: c, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: true, Trusted: IsTrustedIP(remote_addr.String()), ActiveTrace: IsPeerTraced(remote_addr.String())}
-		new_logger := logger.WithName(remote_addr.String())
+		new_logger := logger.WithName("INC").WithName(remote_addr.String())
+
 		connection.logger = new_logger
 
 		if connection.ActiveTrace {
@@ -701,7 +702,7 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 
 	c := &Connection{Client: client, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: incoming, SyncNode: sync_node, Trusted: IsTrustedIP(remote_addr.String()), ActiveTrace: IsPeerTraced(remote_addr.String())}
 	defer c.exit()
-	new_logger := logger.WithName("outgoing").WithName(remote_addr.String())
+	new_logger := logger.WithName("OUT").WithName(remote_addr.String())
 	c.logger = new_logger
 	set_handlers(client)
 

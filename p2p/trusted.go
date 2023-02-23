@@ -18,6 +18,22 @@ import (
 var trusted_map = make(map[string]int64)
 var trust_mutex sync.Mutex
 
+func IsSyncNode(Addr string) bool {
+
+	Address := ParseIPNoError(Addr)
+
+	trust_mutex.Lock()
+	defer trust_mutex.Unlock()
+
+	for _, ip := range config.Mainnet_seed_nodes {
+		if Address == ParseIPNoError(ip) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func GetTrustedMap() map[string]int64 {
 
 	trust_mutex.Lock()
