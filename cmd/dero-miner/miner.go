@@ -194,7 +194,7 @@ func main() {
 
 	if !globals.Arguments["--testnet"].(bool) {
 		// default miner node : dero-node.mysrv.cloud
-		daemon_rpc_address = "community-pools.mysrv.cloud"
+		daemon_rpc_address = "community-pools.mysrv.cloud:10300"
 	} else {
 		daemon_rpc_address = "127.0.0.1:10100"
 	}
