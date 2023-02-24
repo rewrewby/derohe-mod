@@ -92,7 +92,7 @@ func (connection *Connection) dispatch_test_handshake() {
 			connection.logger.Error(err, "Outgoing Handshake Failed")
 		}
 		// connection.logger.V(3).Error(err, "cannot handshake", "error", err.Error())
-		connection.exit(fmt.Sprintf("Outgoing Handshake Failed: %s", err.Error()))
+		connection.exit("Outgoing Handshake Failed")
 		return
 	}
 

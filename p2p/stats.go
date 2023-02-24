@@ -913,12 +913,6 @@ func LogMiniblock(mbl block.MiniBlock, Address string, sent int64) {
 		stat.SentTime = sent
 
 		MiniblockLogs[MiniblockHash] = stat
-
-		if !found {
-			globals.ForeignMiniFoundTime_lock.Lock()
-			defer globals.ForeignMiniFoundTime_lock.Unlock()
-			globals.ForeignMiniFoundTime[MinerWallet] = append(globals.ForeignMiniFoundTime[MinerWallet], sent)
-		}
 	}
 }
 

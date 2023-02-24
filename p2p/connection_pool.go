@@ -127,14 +127,17 @@ func Address(c *Connection) string {
 	return ParseIPNoError(c.Addr.String())
 }
 
+var last_to_disconnect string
+
 func (c *Connection) exit(reason string) {
 	defer globals.Recover(0)
 
-	if config.RunningConfig.TraceNewConnections && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
+	if last_to_disconnect != c.Addr.String() && config.RunningConfig.TraceNewConnections && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
+		last_to_disconnect = c.Addr.String()
 
 		switch reason {
 
-		case "Process Outgoing Connection", "Delete connection":
+		case "Process Outgoing Connection", "Delete connection", "Outgoing Handshake Failed", "Cleaning pending connection":
 
 		default:
 
