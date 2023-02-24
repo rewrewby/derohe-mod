@@ -2315,8 +2315,7 @@ func usage(w io.Writer) {
 	io.WriteString(w, "\t\033[1mactive_nodes\033[0m\tShow Active Mining Nodes\n")
 	io.WriteString(w, "\t\033[1mshow_selfish\033[0m\tShow Nodes that don't play nice\n")
 	io.WriteString(w, "\t\033[1mtrace_peer <ip>\033[0m\tTrace Peer Communication\n")
-
-	io.WriteString(w, fmt.Sprintf(blue+"%-28s "+yellow+"%-38s\n"+reset_color, "ping [<ip>|all|seeds|trusted]", "ping peer(s)"))
+	io.WriteString(w, "\t\033[1mping [<ip>|all|seeds|trusted]\033[0m\tping peer(s)\n")
 
 }
 

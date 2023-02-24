@@ -19,7 +19,7 @@ If you don't alredy know DERO - Check out [DEROHE Git Repo](https://github.com/d
 * Live TX, Blocks, Orphans and Node Connectiviy Tracking (Eye Candy)
 * Running Node Config Changes
 * Enhanced debug features
-* Anti-Cheat Mining Feature
+* Anti-Cheat Mining Feature, Miniblock and TX Spam Mitigation
 * Many new command (check `help` and `config` for more info)
 * Wallet has TOR & SOCKS5 Support. Default remote host is https://dero-api.mysrv.cloud/ (SSL Encrypted)
 * Miner's default node is DERO Community Pools at `community-pools.mysrv.cloud:10300`

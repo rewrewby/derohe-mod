@@ -168,123 +168,6 @@ func AddBlockToOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
 
 }
 
-func AddBlockToOrphanNetworkBlockCollection(cbl block.Complete_Block, miner string) {
-
-	logger.Info("Adding orphan complete block to collection")
-	orphan_block_mutex.Lock()
-	defer orphan_block_mutex.Unlock()
-
-	list, list_found := OrphanFullBlocks[miner]
-	if !list_found {
-		OrphanFullBlocks[miner] = append(OrphanFullBlocks[miner], cbl)
-	}
-
-	found := false
-	for _, block := range list {
-		if block.Bl.GetHash() == cbl.Bl.GetHash() {
-			found = true
-		}
-	}
-	if !found {
-		OrphanFullBlocks[miner] = append(OrphanFullBlocks[miner], cbl)
-	}
-
-}
-
-func GetLatestFullOrphan() (err error, selected_miner string, selected_block block.Complete_Block) {
-
-	orphan_block_mutex.Lock()
-	defer orphan_block_mutex.Unlock()
-
-	found_height := uint64(0)
-	for miner, block_list := range OrphanFullBlocks {
-		for _, block := range block_list {
-			if block.Bl.Height+6 != uint64(chain.Get_Height()) {
-				continue
-			}
-
-			if block.Bl.Height >= found_height {
-				// logger.Info("Selected block", "bl.height", block.Bl.Height, "height", chain.Get_Height())
-				selected_block = block
-				selected_miner = miner
-				found_height = block.Bl.Height
-			}
-		}
-	}
-
-	if found_height == 0 {
-		err = fmt.Errorf("Unable to find a block")
-	}
-
-	return
-
-}
-
-func GetOrphanMiniBlocksFromHeight(height uint64) map[string][]block.MiniBlock {
-	orphan_block_mutex.Lock()
-	defer orphan_block_mutex.Unlock()
-
-	var blocks = make(map[string][]block.MiniBlock)
-
-	for miner, list := range OrphanMiniBlocks {
-		var new_list []block.MiniBlock
-		for _, mbl := range list {
-			if mbl.Height >= height {
-				new_list = append(new_list, mbl)
-			}
-		}
-		if len(new_list) >= 1 {
-			blocks[miner] = new_list
-		}
-	}
-
-	return blocks
-}
-
-func GetOrphanFullBlocksFromHeight(height uint64) map[string][]block.Complete_Block {
-	orphan_block_mutex.Lock()
-	defer orphan_block_mutex.Unlock()
-
-	var blocks = make(map[string][]block.Complete_Block)
-
-	for miner, list := range OrphanFullBlocks {
-		var new_list []block.Complete_Block
-		for _, block := range list {
-			if block.Bl.Height >= height {
-				new_list = append(new_list, block)
-			}
-		}
-		if len(new_list) >= 1 {
-			blocks[miner] = new_list
-		}
-	}
-	return blocks
-}
-
-func GetFullBlockOrphan() (blocks map[string][]block.Complete_Block) {
-	orphan_block_mutex.Lock()
-	defer orphan_block_mutex.Unlock()
-
-	for miner, list := range OrphanFullBlocks {
-		blocks[miner] = list
-	}
-	return
-}
-
-func GetFullBlockIDOrphan() (blocks [][32]byte) {
-	orphan_block_mutex.Lock()
-	defer orphan_block_mutex.Unlock()
-
-	for _, list := range OrphanFullBlocks {
-		for _, block := range list {
-			blid := block.Bl.GetHash()
-			blocks = append(blocks, blid)
-		}
-
-	}
-	return
-}
-
 func AddBlockToOrphanBlockCollection(bl block.MiniBlock, miner string) {
 	orphan_block_mutex.Lock()
 	defer orphan_block_mutex.Unlock()
@@ -892,8 +775,6 @@ func LogFinalBlock(bl block.Block, Address string, sent int64) {
 
 }
 
-var last_mining_time uint16
-
 func LogMiniblock(mbl block.MiniBlock, Address string, sent int64) {
 
 	log_miniblock_mutex.Lock()
@@ -915,24 +796,6 @@ func LogMiniblock(mbl block.MiniBlock, Address string, sent int64) {
 		MiniblockLogs[MiniblockHash] = stat
 	}
 }
-
-// func CopyLatestLogMiniblock(height int64) map[string]MiniBlockLog {
-
-// 	log_miniblock_mutex.Lock()
-// 	defer log_miniblock_mutex.Unlock()
-
-// 	var CopyMiniblockLogs = make(map[string]MiniBlockLog)
-
-// 	for hash, data := range MiniblockLogs {
-// 		if data.Miniblock.Height >= uint64(height) {
-// 			// logger.Info("Height Check", "block height", data.Miniblock.Height, "test height", height)
-// 			CopyMiniblockLogs[hash] = data
-// 		}
-// 	}
-
-// 	return CopyMiniblockLogs
-
-// }
 
 func LogAccept(Address string) {
 
@@ -1154,15 +1017,6 @@ func PeerLogConnectionFail(Address string, Block_Type string, PeerID uint64, Mes
 
 		peer.Sending_Errors = stat
 	}
-
-	// context_deadline := regexp.MustCompile("^context deadline exceeded")
-	// // If errors showing connection error, then log this so peer can get cleaned up
-	// connection_down := regexp.MustCompile("^connection is shut down")
-	// closed_pipe := regexp.MustCompile("io: read/write on closed pipe")
-
-	// if connection_down.Match([]byte(Message)) || closed_pipe.Match([]byte(Message)) || context_deadline.Match([]byte(Message)) {
-	// 	go Peer_SetFail(Address)
-	// }
 
 	Pstat[Address] = peer
 }
