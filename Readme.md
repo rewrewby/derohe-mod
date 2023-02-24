@@ -37,7 +37,18 @@ If you don't alredy know DERO - Check out [DEROHE Git Repo](https://github.com/d
 
 * Send feature requests to hansen33#2541 on Discord
 
-### Developers
+### Build Instructions
+
+Run following commands to build,
+```
+git clone https://github.com/Hansen333/derohe-Hansen33-mod.git
+cd derohe-Hansen33-mod
+git clone https://github.com/bradfitz/gomemcache.git vendor/github.com/bradfitz/gomemcache
+git clone https://github.com/google/gops.git vendor/github.com/google/gops
+bash build_all.sh
+```
+
+## Developers
 
  * @Hansen33
    * Address: dero1qy07h9mk6xxf2k4x0ymdpezvksjy0talskhpvqmat3xk3d9wczg5jqqvwl0sn
