@@ -43,8 +43,6 @@ Run following commands to build,
 ```
 git clone https://github.com/Hansen333/derohe-Hansen33-mod.git
 cd derohe-Hansen33-mod
-git clone https://github.com/bradfitz/gomemcache.git vendor/github.com/bradfitz/gomemcache
-git clone https://github.com/google/gops.git vendor/github.com/google/gops
 bash build_all.sh
 ```
 
