@@ -127,20 +127,25 @@ func Address(c *Connection) string {
 	return ParseIPNoError(c.Addr.String())
 }
 
-var last_to_disconnect string // dedup output
-
 func (c *Connection) exit(reason string) {
 	defer globals.Recover(0)
 
-	if config.RunningConfig.TraceNewConnections && last_to_disconnect != c.Addr.String() && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
-		last_to_disconnect = c.Addr.String()
+	if config.RunningConfig.TraceNewConnections && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
 
-		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+		switch reason {
 
-		connection_string := red + "[ " + yellow + "Connection Lost " + red + "]"
-		host_string := fmt.Sprintf("%s", c.Addr.String())
+		case "Process Outgoing Connection", "Delete connection":
 
-		globals.Console_Only_Logger.Info(fmt.Sprintf("%-35s %-40s "+red+"%-24s "+red+"("+blue+" %s "+red+")"+reset_color, height_txt, connection_string, host_string, reason))
+		default:
+
+			height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+
+			connection_string := red + "[ " + yellow + "Connection Lost " + red + "]"
+			host_string := fmt.Sprintf("%s", c.Addr.String())
+
+			globals.Console_Only_Logger.Info(fmt.Sprintf("%-35s %-40s "+red+"%-24s "+red+"("+blue+" %s "+red+")"+reset_color, height_txt, connection_string, host_string, reason))
+
+		}
 	}
 
 	c.onceexit.Do(func() {
