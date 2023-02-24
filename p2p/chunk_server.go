@@ -1,22 +1,22 @@
 package p2p
 
 // this file implements incoming chunk processor
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+	"sync"
+	"time"
 
-import "time"
-import "sync"
-import "bytes"
-
-import "github.com/fxamacker/cbor/v2"
-
-import "github.com/klauspost/reedsolomon"
-import "github.com/deroproject/derohe/block"
-import "github.com/deroproject/derohe/transaction"
-import "github.com/deroproject/derohe/globals"
-import "github.com/deroproject/derohe/errormsg"
-import "github.com/deroproject/derohe/config"
-import "github.com/deroproject/derohe/metrics"
-import "github.com/deroproject/derohe/cryptography/crypto"
+	"github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/derohe/cryptography/crypto"
+	"github.com/deroproject/derohe/errormsg"
+	"github.com/deroproject/derohe/globals"
+	"github.com/deroproject/derohe/metrics"
+	"github.com/deroproject/derohe/transaction"
+	"github.com/fxamacker/cbor/v2"
+	"github.com/klauspost/reedsolomon"
+)
 
 var chunk_map sync.Map // key is blid, value is pointer to  Chunks_Per_Block_Data
 
@@ -65,7 +65,7 @@ func (connection *Connection) feed_chunk(chunk *Block_Chunk, sent int64) error {
 
 	if chunk.HHash != chunk.HeaderHash() {
 		connection.logger.V(2).Info("This peer should be banned, since he supplied wrong chunk")
-		connection.exit()
+		connection.exit("Corrupted Chunk")
 		return fmt.Errorf("Corrupted Chunk")
 	}
 

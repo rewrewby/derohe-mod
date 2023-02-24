@@ -104,10 +104,18 @@ type Connection struct {
 	clock_offset  int64 // duration updated on every miniblock
 	onceexit      sync.Once
 
-	Mutex sync.Mutex // used only by connection go routine
+	Mutex       sync.Mutex // used only by connection go routine
+	Hansen33Mod bool
+	Trusted     bool
+	ActiveTrace bool
 }
 
 func ConnecToNode(address string) {
+
+	// reset backoff so we can connect straight away
+	backoff_mutex.Lock()
+	backoff[ParseIPNoError(address)] = 0
+	backoff_mutex.Unlock()
 
 	go connect_with_endpoint(address, false)
 }
@@ -119,40 +127,53 @@ func Address(c *Connection) string {
 	return ParseIPNoError(c.Addr.String())
 }
 
-func (c *Connection) exit() {
+var last_to_disconnect string
+
+func (c *Connection) exit(reason string) {
 	defer globals.Recover(0)
+
+	if last_to_disconnect != c.Addr.String() && config.RunningConfig.TraceNewConnections && IsAddressConnected(ParseIPNoError(c.Addr.String())) {
+		last_to_disconnect = c.Addr.String()
+
+		switch reason {
+
+		case "Process Outgoing Connection", "Delete connection", "Outgoing Handshake Failed", "Cleaning pending connection":
+
+		default:
+
+			height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+
+			connection_string := red + "[ " + yellow + "Connection Lost " + red + "]"
+			host_string := fmt.Sprintf("%s", c.Addr.String())
+
+			globals.Console_Only_Logger.Info(fmt.Sprintf("%-35s %-40s "+red+"%-24s "+red+"("+blue+" %s "+red+")"+reset_color, height_txt, connection_string, host_string, reason))
+
+		}
+	}
+
 	c.onceexit.Do(func() {
 		c.Client.Close()
 		c.ConnTls.Close()
 		c.Conn.Close()
 
 	})
-
 }
 
 // add connection to  map
 func Connection_Delete(c *Connection) {
-
-	duplicate_connection_mutex.Lock()
-	defer duplicate_connection_mutex.Unlock()
-	ip_str, x := ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())]
-	if x {
-		if ip_str == c.Addr.String() {
-			c.logger.V(2).Info(fmt.Sprintf("Deleting Connection: %s", c.Addr.String()))
-			delete(ConnectDuplicatioMap, ParseIPNoError(c.Addr.String()))
-		} else {
-			c.logger.V(2).Info(fmt.Sprintf("Deleting Duplicate Connection: %s vs %s", ip_str, c.Addr.String()))
-		}
-	}
 
 	connection_map.Range(func(k, value interface{}) bool {
 		v := value.(*Connection)
 
 		// Clear all connection to same IP
 		if c.Addr.String() == v.Addr.String() {
-			c.exit()
+			v.exit("Delete connection")
 			// if ParseIPNoError(c.Addr.String()) == ParseIPNoError(v.Addr.String()) {
 			connection_map.Delete(Address(v))
+
+			if c.ActiveTrace {
+				c.logger.Info("Connection disconnected")
+			}
 			return false
 		}
 		return true
@@ -165,20 +186,20 @@ func Connection_Pending_Clear() {
 	connection_map.Range(func(k, value interface{}) bool {
 		v := value.(*Connection)
 		if atomic.LoadUint32(&v.State) == HANDSHAKE_PENDING && time.Now().Sub(v.Created) > 10*time.Second { //and skip ourselves
-			v.exit()
+			v.exit("Cleaning pending connection")
 			v.logger.V(3).Info("Cleaning pending connection")
 		}
 
 		if time.Now().Sub(v.update_received).Round(time.Second).Seconds() > 20 && pending_clear_count < 10 {
-			v.exit()
-			Connection_Delete(v)
+			v.exit("Cleaning pending connection")
+			go Connection_Delete(v)
 			v.logger.V(1).Info(fmt.Sprintf("Purging connection (%s) since idle for %s", v.Addr.String(), time.Now().Sub(v.update_received).Round(time.Second).String()))
 			pending_clear_count++
 		}
 
 		if IsAddressInBanList(Address(v)) {
-			v.exit()
-			Connection_Delete(v)
+			v.exit("Cleaning pending connection")
+			go Connection_Delete(v)
 			v.logger.V(1).Info("Purging connection due to ban list")
 		}
 
@@ -207,18 +228,7 @@ func IsAddressConnected(address string) bool {
 
 var connection_counter int = 0
 
-var ConnectDuplicatioMap = make(map[string]string)
-var duplicate_connection_mutex sync.Mutex
-
 func Connection_Add(c *Connection) bool {
-
-	duplicate_connection_mutex.Lock()
-	defer duplicate_connection_mutex.Unlock()
-	_, x := ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())]
-	if x {
-		c.logger.Info(fmt.Sprintf("Connection (%s) already added (%s)", c.Addr.String(), ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())]))
-		return true
-	}
 
 	if dup, ok := connection_map.LoadOrStore(Address(c), c); !ok {
 
@@ -228,12 +238,10 @@ func Connection_Add(c *Connection) bool {
 
 		c.logger.V(3).Info(fmt.Sprintf("IP address being added (%d)", connection_counter), "ip", c.Addr.String())
 
-		ConnectDuplicatioMap[ParseIPNoError(c.Addr.String())] = c.Addr.String()
-
 		return true
 	} else {
 		c.logger.V(3).Info("IP address already has one connection, exiting this connection", "ip", c.Addr.String(), "pre", dup.(*Connection).Addr.String())
-		c.exit()
+		c.exit("IP address already connected")
 		return false
 	}
 }
@@ -275,15 +283,35 @@ func ping_loop() {
 					request.Common.PeerList = get_peer_list_specific(Address(c))
 				}
 
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				if c.ActiveTrace {
+					c.logger.Info("Outgoing Ping Request", "request", request)
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				defer cancel()
 
 				if err := c.Client.CallWithContext(ctx, "Peer.Ping", request, &response); err != nil {
-					c.logger.V(2).Error(err, "ping failed")
-					c.exit()
+
+					err = fmt.Errorf("%s", err.Error())
+
+					if c.ActiveTrace {
+						c.logger.Info("OUT-REQ: Ping Failed", "err", err.Error())
+					}
+
+					if err.Error() == "context deadline exceeded" || err.Error() == "timeout" {
+						return
+					}
+
+					c.exit("Ping Failed")
+					go Connection_Delete(c)
+
 					return
 				}
 				c.update(&response.Common) // update common information
+				if c.ActiveTrace {
+					c.logger.Info("Outgoing Ping Request", "response", response)
+				}
+
 			}()
 		}
 		return true
@@ -369,6 +397,7 @@ func Connection_Print() {
 
 		fmt.Print(color_normal)
 	}
+	logger.Info("Connection info for peers", "count", len(clist), "our Statehash", StateHash)
 
 	avg_latency := sum_latency / int64(len(clist))
 	fmt.Printf("Average Latency: %7s\n", time.Duration(avg_latency).Round(time.Millisecond).String())
@@ -445,6 +474,10 @@ func broadcast_Block_Coded(cbl *block.Complete_Block, PeerID uint64, first_seen 
 		return
 	}*/
 
+	if peerid == 0 {
+		go LogFinalBlock(*cbl.Bl, "127.0.0.1", globals.Time().UTC().UnixMicro())
+	}
+
 	blid := cbl.Bl.GetHash()
 
 	logger.V(1).Info("Will broadcast block", "blid", blid, "tx_count", len(cbl.Bl.Tx_hashes), "txs", len(cbl.Txs))
@@ -453,6 +486,7 @@ func broadcast_Block_Coded(cbl *block.Complete_Block, PeerID uint64, first_seen 
 
 	our_height := chain.Get_Height()
 	// build the request once and dispatch it to all possible peers
+	tries := 0
 	count := 0
 	unique_map := UniqueConnections()
 
@@ -482,6 +516,11 @@ func broadcast_Block_Coded(cbl *block.Complete_Block, PeerID uint64, first_seen 
 				return
 			default:
 			}
+
+			if tries > 1024 {
+				return
+			}
+			tries++
 			if atomic.LoadUint32(&v.State) != HANDSHAKE_PENDING && PeerID != v.Peer_ID && v.Peer_ID != GetPeerID() { // skip pre-handshake connections
 
 				// if the other end is > 2 blocks behind, do not broadcast block to him
@@ -791,8 +830,6 @@ func trigger_sync() {
 					//connection.Lock()
 
 					connection.logger.V(1).Info("We need to resync with the peer", "our_height", height, "height", connection.Height, "pruned", connection.Pruned)
-
-					logger.Info(fmt.Sprintf("Peer telling us we're on wrong height: %s", connection.Addr.String()))
 
 					//connection.Unlock()
 					// set mode to syncronising

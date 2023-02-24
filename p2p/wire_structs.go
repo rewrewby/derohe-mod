@@ -16,9 +16,12 @@
 
 package p2p
 
-import "fmt"
-import "strings"
-import "github.com/deroproject/derohe/cryptography/crypto"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/deroproject/derohe/cryptography/crypto"
+)
 
 // This file defines the structure for the protocol which is CBOR ( which is standard) stream multiplexed using yamux
 // stream multiplexing allows us have bidirection RPC using net/rpc
@@ -58,6 +61,7 @@ type Handshake_Struct struct {
 	PeerList        []Peer_Info   `cbor:"PLIST"`
 	Extension_List  []string      `cbor:"EXT"`
 	Request         bool          `cbor:"REQUEST"` //whether this is a request
+	Hansen33Mod     bool          `cbor:"MODDED"`
 }
 
 type Peer_Info struct {
@@ -99,7 +103,7 @@ type Objects struct {
 	Chunks     []Block_Chunk    `cbor:"CHUNKS,omitempty"` // all requested chunks are here
 }
 
-//  used to request what all changes are done by the block to the chain
+// used to request what all changes are done by the block to the chain
 type ChangeList struct {
 	Common      Common_Struct `cbor:"COMMON"` // add all fields of Common
 	TopoHeights []int64       `cbor:"TOPO"`
@@ -129,6 +133,7 @@ type Response_Tree_Section_Struct struct {
 	StateHash     [32]byte      `cbor:"STATE"`
 	Keys          [][]byte      `cbor:"KEYS,omitempty"`   // changes to state tree
 	Values        [][]byte      `cbor:"VALUES,omitempty"` // changes to state tree
+	KeyCount      int64         `cbor:"KEYCOUNT"`         // estimated keys in this tree
 }
 
 type Tree_Changes struct {

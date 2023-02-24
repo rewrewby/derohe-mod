@@ -1,102 +1,57 @@
 ### Welcome to the DEROHE - Hansen33 Mod
 
-If you don't alredy know DERO - Check out [Dero git repo](https://github.com/deroproject/derohe)
+If you don't alredy know DERO - Check out [DEROHE Git Repo](https://github.com/deroproject/derohe)
 
-* This is a Weaponized version of Dero Daemon, this is NOT the official release of DERO.
-* Please use with caution, as with all weapons you may or may not hurt yourself or others using this.
+* This is NOT the official release of DERO. This version is a modified version of DERO.
 * If all your minis get lost or your computer blows up, it's no my fault, you installed this.
 
+* This modded DERO version is powering DERO Community Pools and it's related services.
+  * DERO Community Pools - https://community-pools.mysrv.cloud/
+  * DERO API - https://dero-api.mysrv.cloud/
 
-* This modded DERO version is running and providing live stats for on the nodes below
-  * Europe Node - https://dero-node.mysrv.cloud
-  * North America Node - https://dero-node-us.mysrv.cloud 
-  * South Ammerica Node - https://dero-node-sa.mysrv.cloud 
+### What is Hansen33 Mod?
 
-### Developers
+* A community driven fork of the offical DEROHE Suite (daemon, miner and wallet) which has additional features and functionality.
 
- * @Hansen33
-   * Address: dero1qy07h9mk6xxf2k4x0ymdpezvksjy0talskhpvqmat3xk3d9wczg5jqqvwl0sn
- * @arodd
-   * Address: dero1qyss8jkqfkvp4vlxfx3l7f9rr7m55ff3q633ag8xemzv0el90m2j2qqy0te2c
- * @mmarcel
-   * Address: dero1qydkj6dznyk5njmzr96hjcr5uj74anqqqv90mg39mtzm4d2dcpwsqqqk6zvve
+### Changes from official release includes (but not limited to)
 
-### Changes from official release includes
-
- More Options, switches and buttons 
- * Miner (--text-mode) - no interactiveness, just mining and output update every 60 sec
- * Active Miner Metrics - Node Guessing
- * Miner Hashrate, Tagging and Orphan to Miner Reporting**
- * Live mining stats including orphan counters.
- * Wallet Socks Proxy Support and TOR Onion Support**
- `  --daemon-address vpilhs5wew52w75igez5fye2c572lccuo7l5emyxxvo53darwec6x7yd.onion:10102`
- * BlocksIn/BlocksOut count in syncinfo - repurposed unused official counters
- * AddressToName - command to look up names inside derod (using HarkerK code)
- * Allow more than 31 incoming peers (will use max_peer option as limit)
- * Miners list and mining performance stats
- * Autoban of bad miners
- * Orphan and mined blocks metrics
- * Node mining performance metrics (more RPC calls)
- * Change Runtime Config - P2P Turbo, BW_FACTOR, Min Peers and more
- * Change debug level during runtime
- * Diagnostic Check and Troubleshooting Tips - Identify bad actors
- * More Peer Info
- * Logging of Peer Errors
- * Permanent Ban IP
- * Permanent Ban List Persistency - Save to file
- * Save and Display Uptime
- * More mining stats
- * Improved Peer List
- * Auto saving bans.json and peers.json
- * More Peers - Removed internal limitations
- * Whitelist incoming connections option
- * Turtle Mode Indicator - If node is running optimal
- * Uptime Stats
- * Some Mining Performance Stats
- * Running Config + System Tuning
- * Updates to Peer Management and Error Logging ( peer_list + peer_errors )
- * Wallet Support for https:// and wss:// when accessing remote wallet
- * Defaulting to use https://dero-node.mysrv.cloud/ as remote node
- * Default integrator address set to dero1qy07h9mk6xxf2k4x0ymdpezvksjy0talskhpvqmat3xk3d9wczg5jqqvwl0sn
- * FIX: Report seconds not mili seconds in simulator
- * Threshold to highlight Peers with Block Transmission Success Rate below x
- * Threshold to highlight Peers latency below x threshold
- * Clear peers stats, individual or all
- * Trusted Mode -Trusted Peers List / Only Connect To Trusted Peers
- * Quick Connect to Hansen Nodes 
- * ban_above_height - ban all peers over a specific height
- * connect_to_peer <ip:port> (Initialise new connection to peer)
- * Quick Connect to Seed Nodes 
+* Many Mining and Network stats
+* Live TX, Blocks, Orphans and Node Connectiviy Tracking (Eye Candy)
+* Running Node Config Changes
+* Enhanced debug features
+* Anti-Cheat Mining Feature, Miniblock and TX Spam Mitigation
+* Many new command (check `help` and `config` for more info)
+* Wallet has TOR & SOCKS5 Support. Default remote host is https://dero-api.mysrv.cloud/ (SSL Encrypted)
+* Miner's default node is DERO Community Pools at `community-pools.mysrv.cloud:10300`
 
 ### Screen Shots
 
-#### Mining and Miners Stats
+![Hansen33Mod](https://dero-api.mysrv.cloud/images/hansenmod-start.png)
+![Active Miners](https://dero-api.mysrv.cloud/images/active_miners_cli.png)
 
-![Miners](https://dero-node.mysrv.cloud/images/miner_stats.png)
-![Mined Blocks](https://dero-node.mysrv.cloud/images/mined_blocks.png)
+## Installation
 
-#### More Commands
+* Hansen33 Mod is 100% compatible with official DERO, so you can safely use same data directory.
+* Download binary from release page or compile from source.
+* Replace Official binary file (make backup first)
 
-![More Options](https://dero-node.mysrv.cloud/images/more-options.png)
-![Running Config](https://dero-node.mysrv.cloud/images/running-config.png)
+* Send feature requests to hansen33#2541 on Discord
 
-#### Diagnostics
+### Build Instructions
 
-![Diagnostics](https://dero-node.mysrv.cloud/images/diagnostics.png)
-![Diagnostic Report](https://dero-node.mysrv.cloud/images/diagnostic_report.png)
+Run following commands to build,
+```
+git clone https://github.com/Hansen333/derohe-Hansen33-mod.git
+cd derohe-Hansen33-mod
+git clone https://github.com/bradfitz/gomemcache.git vendor/github.com/bradfitz/gomemcache
+git clone https://github.com/google/gops.git vendor/github.com/google/gops
+bash build_all.sh
+```
 
-#### Peering Stuff
+## Developers
 
-![Trusted Mode](https://dero-node.mysrv.cloud/images/trusted_mode.png)
-![Peer Errors](https://dero-node.mysrv.cloud/images/peer_errors.png)
-![Peer Info](https://dero-node.mysrv.cloud/images/peer_info.png)
-![Peer List](https://dero-node.mysrv.cloud/images/peer_list.png)
-
-### TODO
-
- * More Automation
- * More of the same
- * Send feature requests to hansen33#2541 on Discord
-
-
+ * @Hansen33
+   * Address: dero1qy07h9mk6xxf2k4x0ymdpezvksjy0talskhpvqmat3xk3d9wczg5jqqvwl0sn
+ * @mmarcel
+   * Address: dero1qydkj6dznyk5njmzr96hjcr5uj74anqqqv90mg39mtzm4d2dcpwsqqqk6zvve
 

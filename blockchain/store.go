@@ -16,17 +16,20 @@
 
 package blockchain
 
-import "fmt"
-import "math/big"
-import "path/filepath"
+import (
+	"encoding/json"
+	"fmt"
+	"math/big"
+	"path/filepath"
 
-import "github.com/deroproject/derohe/globals"
-import "github.com/deroproject/derohe/block"
-import "github.com/deroproject/derohe/config"
-import "github.com/deroproject/derohe/transaction"
-import "github.com/deroproject/derohe/cryptography/crypto"
-
-import "github.com/deroproject/graviton"
+	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/derohe/cryptography/crypto"
+	"github.com/deroproject/derohe/globals"
+	"github.com/deroproject/derohe/transaction"
+	"github.com/deroproject/graviton"
+)
 
 // though these can be done within a single DB, these are separated for completely clarity purposes
 type storage struct {
@@ -42,6 +45,7 @@ func (s *storage) Initialize(params map[string]interface{}) (err error) {
 	if s.Balance_store, err = graviton.NewDiskStore(filepath.Join(current_path, "balances")); err == nil {
 		if err = s.Topo_store.Open(current_path); err == nil {
 			s.Block_tx_store.basedir = current_path
+			s.Block_tx_store.migrate_old_tx()
 		}
 	}
 
@@ -101,11 +105,29 @@ func (chain *Blockchain) StoreBlock(bl *block.Block, snapshot_version uint64) {
 func (chain *Blockchain) Load_BL_FROM_ID(hash [32]byte) (*block.Block, error) {
 	var bl block.Block
 
+	// Memcached tuning
+	cache_id := fmt.Sprintf("BL-HASH-ID-%x", hash)
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(cache_id)
+		if err == nil {
+			if err = json.Unmarshal(val.Value, &bl); err == nil {
+				// return cached result
+				return &bl, nil
+			}
+		}
+	}
+
 	if block_data, err := chain.Store.Block_tx_store.ReadBlock(hash); err == nil {
 
 		if err = bl.Deserialize(block_data); err != nil { // we should deserialize the block here
 			//logger.Warnf("fError deserialiing block, block id %x len(data) %d data %x err %s", hash[:], len(block_data), block_data, err)
 			return nil, err
+		}
+
+		if globals.MemcachedEnabled {
+			if data, err := json.Marshal(bl); err == nil {
+				globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+			}
 		}
 
 		return &bl, nil
@@ -292,7 +314,7 @@ func (chain *Blockchain) Load_Block_Topological_order_at_index(index_pos int64) 
 
 }
 
-//load store hash from 2 tree
+// load store hash from 2 tree
 func (chain *Blockchain) Load_Merkle_Hash(version uint64) (hash crypto.Hash, err error) {
 
 	if hashi, ok := chain.cache_VersionMerkle.Get(version); ok {
@@ -334,6 +356,19 @@ func (chain *Blockchain) Load_Merkle_Hash(version uint64) (hash crypto.Hash, err
 // loads a complete block from disk
 func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Complete_Block, err error) {
 	cbl = &block.Complete_Block{}
+
+	// Memcached tuning
+	cache_id := fmt.Sprintf("CBL-%s", blid.String())
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(cache_id)
+		if err == nil {
+			if err = json.Unmarshal(val.Value, &cbl); err == nil {
+				// return cached result
+				return cbl, nil
+			}
+		}
+	}
+
 	cbl.Bl, err = chain.Load_BL_FROM_ID(blid)
 	if err != nil {
 		return
@@ -352,5 +387,13 @@ func (chain *Blockchain) Load_Complete_Block(blid crypto.Hash) (cbl *block.Compl
 		}
 
 	}
+
+	// memcached save
+	if globals.MemcachedEnabled {
+		if data, err := json.Marshal(cbl); err == nil {
+			globals.Cache.Set(&memcache.Item{Key: cache_id, Value: data})
+		}
+	}
+
 	return
 }

@@ -16,8 +16,10 @@
 
 package p2p
 
-import "github.com/deroproject/derohe/config"
-import "github.com/deroproject/graviton"
+import (
+	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/graviton"
+)
 
 const max_request_topoheights = 50
 
@@ -26,7 +28,7 @@ func (c *Connection) ChangeSet(request ChangeList, response *Changes) (err error
 	defer handle_connection_panic(c)
 	if len(request.TopoHeights) < 1 || len(request.TopoHeights) > max_request_topoheights { // we are expecting 1 block or 1 tx
 		c.logger.V(1).Info("malformed object request  received, banning peer", "request", request)
-		c.exit()
+		c.exit("malformed object request")
 		return nil
 	}
 

@@ -16,7 +16,11 @@
 
 package p2p
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/deroproject/derohe/config"
+)
 
 // peer has requested some objects, we must respond
 // if certain object is not in our list we respond with empty buffer for that slot
@@ -26,9 +30,16 @@ func (connection *Connection) GetObject(request ObjectList, response *Objects) e
 	var err error
 	if len(request.Block_list) < 1 && len(request.Tx_list) < 1 && len(request.Chunk_list) < 1 { // we are expecting 1 block or 1 tx
 		connection.logger.V(2).Info("malformed object request  received, banning peer", "request", request)
-		connection.exit()
+		connection.exit("malformed object request")
 		return nil
 	}
+
+	if len(request.Tx_list) > config.RunningConfig.MaxTXRequest {
+		connection.logger.V(0).Info("Too many TX in Request received, banning peer", "request", request)
+		connection.exit("Too many TX in Request received, should ban peer")
+		return nil
+	}
+
 	connection.update(&request.Common) // update common information
 
 	for i := range request.Block_list { // find the block
@@ -38,6 +49,7 @@ func (connection *Connection) GetObject(request ObjectList, response *Objects) e
 			return err
 		}
 		cbl.Block = bl.Serialize()
+
 		for j := range bl.Tx_hashes {
 			var tx_bytes []byte
 			if tx_bytes, err = chain.Store.Block_tx_store.ReadTX(bl.Tx_hashes[j]); err != nil {

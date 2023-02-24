@@ -18,11 +18,12 @@ package rpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"runtime/debug"
 	"time"
 
-	"github.com/deroproject/derohe/block"
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/deroproject/derohe/blockchain"
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
@@ -37,6 +38,17 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 			err = fmt.Errorf("panic occured. stack trace %s", debug.Stack())
 		}
 	}()
+
+	id := "GetInfo-derod-response"
+	if globals.MemcachedEnabled {
+		val, err := globals.Cache.Get(id)
+		if err == nil {
+			if err = json.Unmarshal(val.Value, &result); err == nil {
+				// return cached result
+				return result, nil
+			}
+		}
+	}
 
 	//result.Difficulty = chain.Get_Difficulty_At_Block(top_id)
 	result.Height = chain.Get_Height()
@@ -107,20 +119,38 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 
 	result.SameHeightChainExtendedCount = blockchain.GetSameHeightChainExtendedCount(chain)
 
-	orphans, blocks, loss_rate, orphan_100 := block.BlockRateCount(result.OurHeight)
+	total_orphans := p2p.CountNetworkOrphanSince(uint64(chain.Get_Height() - config.RunningConfig.NetworkStatsKeepCount))
 
-	result.NetworkBlockRateOrphan100 = float64(float64(float64(orphan_100)/900) * 100)
-	result.NetworkBlockRateOrphan = orphans
-	result.NetworkBlockRateMined = blocks
-	result.OrphanBlockRate = loss_rate
+	network_loss := float64(0)
+	blockcount := config.RunningConfig.NetworkStatsKeepCount * 10
+	if globals.CountTotalBlocks < blockcount {
+		blockcount = globals.CountTotalBlocks
+	} else {
+		blockcount += int64(total_orphans)
+	}
+
+	if total_orphans > 0 && blockcount > 0 {
+		network_loss = float64(float64(total_orphans)/float64(blockcount)) * 100
+	}
+
+	result.NetworkBlockRateOrphan100 = network_loss
+	result.NetworkBlockRateOrphan = total_orphans
+	result.NetworkBlockRateMined = int(blockcount)
+
 	result.RemotePopBlockCount = globals.BlockPopCount
-	result.CountMinisRejected = CountMinisRejected
-	result.CountMinisAccepted = CountMinisAccepted
-	result.CountMinisOrphaned = CountMinisOrphaned
-	result.CountBlocks = CountBlocks
+	result.CountMinisRejected = globals.CountMinisRejected
+	result.CountMinisAccepted = globals.CountMinisAccepted
 
-	blocksMinted := (CountMinisAccepted + CountBlocks)
+	total_orphan_blocks := globals.CountOrphanBlocks + globals.CountOrphanMinis
+	result.CountMinisOrphaned = total_orphan_blocks
+	result.CountBlocks = globals.CountBlocksAccepted
 
+	blocksMinted := (globals.CountBlocksAccepted + globals.CountMinisAccepted)
+	OrphanBlockRate := float64(0)
+	if total_orphan_blocks > 0 {
+		OrphanBlockRate = float64(float64(float64(total_orphan_blocks)/float64(blocksMinted)) * 100)
+	}
+	result.OrphanBlockRate = OrphanBlockRate
 	result.MintingSuccessRate = float64(100)
 	if result.CountMinisOrphaned >= 1 {
 		result.MintingSuccessRate = float64(100 - float64(float64(result.CountMinisOrphaned/blocksMinted)*100))
@@ -150,6 +180,17 @@ func GetInfo(ctx context.Context) (result rpc.GetInfo_Result, err error) {
 	result.HashrateEstimatePercent_1hr = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_1hr()) / 100)
 	result.HashrateEstimatePercent_1day = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_1day()) / 100)
 	result.HashrateEstimatePercent_7day = uint64((float64(chain.Get_Network_HashRate()) * HashrateEstimatePercent_7day()) / 100)
+
+	if globals.MemcachedEnabled {
+		if data, err := json.Marshal(result); err != nil {
+			logger.V(2).Error(err, "Error exporting data")
+		} else {
+			cacheErr := globals.Cache.Set(&memcache.Item{Key: id, Value: data, Expiration: 1})
+			if cacheErr != nil {
+				logger.V(2).Error(cacheErr, "Failed to cache object")
+			}
+		}
+	}
 
 	return result, nil
 }

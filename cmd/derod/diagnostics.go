@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -14,40 +13,27 @@ import (
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
 	"github.com/deroproject/derohe/p2p"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var DiagnosticInterval uint64 = 1
 
 func ToggleDebug(l *readline.Instance, log_level int8) {
 
-	if config.RunningConfig.LogLevel == log_level {
+	if config.RunningConfig.LogLevel == log_level && log_level != 0 {
 		return
 	}
 
-	exename, _ := os.Executable()
-
-	if config.RunningConfig.LogLevel > 0 {
-		logger.Info(fmt.Sprint("Disabling DEBUG (some connection might take few seconds)"))
+	if log_level > 0 {
+		logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
+	} else {
+		p2p.ClearTraceList()
 	}
 
-	logger.Info(fmt.Sprintf("Updating log level to (%d) .. ", log_level))
+	globals.SetLogLevel(l.Stdout(), log_level)
 
-	globals.SetLogLevel(l.Stdout(), &lumberjack.Logger{
-		Filename:   path.Base(exename) + "-diags.log",
-		MaxSize:    100, // megabytes
-		MaxBackups: 2,
-	}, (0 - int(log_level)))
-
-	logger = globals.Logger.WithName("derod")
-
-	p2p_logger := globals.Logger.WithName("P2P")
-	p2p.SetLogger(&p2p_logger)
-
-	core_logger := globals.Logger.WithName("CORE")
-	blockchain.SetLogger(&core_logger)
-
-	logger.V(1).Info("Debug (ENABLED)")
+	if log_level >= 1 {
+		logger.V(1).Info("Debug (ENABLED)")
+	}
 
 	config.RunningConfig.LogLevel = log_level
 
@@ -58,7 +44,8 @@ var boot_timer int64 = globals.StartTime.Unix()
 func RunDiagnosticCheckSquence(chain *blockchain.Blockchain, l *readline.Instance) {
 
 	// when - this is check all the time so
-
+	//disabled for now
+	return
 	if p2p.Peer_Count() <= 10 && time.Now().Unix()-globals.StartTime.Unix() < 180 {
 
 		if time.Now().Unix()-boot_timer > 10 {
@@ -80,7 +67,12 @@ func RunDiagnosticCheckSquence(chain *blockchain.Blockchain, l *readline.Instanc
 
 	w := l.Stdout()
 
-	var old_debug_level = config.RunningConfig.LogLevel
+	old_show_blocks := config.RunningConfig.TraceBlocks
+	config.RunningConfig.TraceBlocks = false
+	old_tracedlist := p2p.PeerTraceList
+	p2p.ClearTraceList()
+	old_debug_level := config.RunningConfig.LogLevel
+
 	ToggleDebug(l, 0)
 
 	if old_debug_level > 0 {
@@ -371,4 +363,11 @@ func RunDiagnosticCheckSquence(chain *blockchain.Blockchain, l *readline.Instanc
 	io.WriteString(w, "\n")
 	globals.DiagnocticCheckRunning = false
 	ToggleDebug(l, old_debug_level)
+
+	// restore traces
+	config.RunningConfig.TraceBlocks = old_show_blocks
+	for _, ip := range old_tracedlist {
+		p2p.AddPeerTraceList(ip)
+	}
+
 }

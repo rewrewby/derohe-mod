@@ -17,6 +17,7 @@
 package p2p
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"sync/atomic"
@@ -156,7 +157,10 @@ try_again:
 	request.TopoHeights = append(request.TopoHeights, 0)
 	fill_common(&request.Common) // fill common info
 
-	if err := connection.Client.Call("Peer.Chain", request, &response); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := connection.Client.CallWithContext(ctx, "Peer.Chain", request, &response); err != nil {
 		connection.logger.V(2).Error(err, "Call failed Chain")
 		return
 	}
@@ -189,10 +193,11 @@ try_again:
 
 	if pop_count >= 1 { // peer is claiming his chain is good and we should rewind
 
-		if !connection.SyncNode {
-			logger.Info(fmt.Sprintf("Peer: %s - Is NOT a seed node, but asked us to pop %d block(s), ignoring", connection.Addr.String(), pop_count))
-			return
-		}
+		// Suspecting this is causing some issues
+		// if !connection.SyncNode {
+		// 	logger.Info(fmt.Sprintf("Peer: %s - Is NOT a seed node, but asked us to pop %d block(s), ignoring", connection.Addr.String(), pop_count))
+		// 	return
+		// }
 
 		globals.BlockPopCount += pop_count
 		connection.logger.V(1).Info("syncing", "pop_count", pop_count)
@@ -230,7 +235,11 @@ try_again:
 				//fmt.Printf("inserting blocks %d %x\n", (int64(i) + response.Start_topoheight), response.Block_list[i][:])
 				orequest.Block_list = append(orequest.Block_list, response.Block_list[i])
 				fill_common(&orequest.Common)
-				if err := connection.Client.Call("Peer.GetObject", orequest, &oresponse); err != nil {
+
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+
+				if err := connection.Client.CallWithContext(ctx, "Peer.GetObject", orequest, &oresponse); err != nil {
 					connection.logger.V(2).Error(err, "Call failed GetObject")
 					return
 				} else { // process the response
@@ -281,7 +290,11 @@ try_again:
 
 				orequest.Block_list = append(orequest.Block_list, response.Block_list[i])
 				fill_common(&orequest.Common)
-				if err := connection.Client.Call("Peer.GetObject", orequest, &oresponse); err != nil {
+
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+
+				if err := connection.Client.CallWithContext(ctx, "Peer.GetObject", orequest, &oresponse); err != nil {
 					connection.logger.V(2).Error(err, "Call failed GetObject")
 					return
 				} else { // process the response
@@ -327,7 +340,7 @@ func (connection *Connection) process_object_response(response Objects, sent int
 		err := bl.Deserialize(response.CBlocks[i].Block)
 		if err != nil { // we have a block which could not be deserialized ban peer
 			connection.logger.V(2).Error(err, "Incoming block could not be deserilised")
-			connection.exit()
+			connection.exit("Incoming block could not be deserilised")
 			if syncing {
 				return nil
 			} else {
@@ -344,7 +357,6 @@ func (connection *Connection) process_object_response(response Objects, sent int
 		}
 		// check whether the object was requested one
 
-		go LogFinalBlock(bl, connection.Addr.String())
 		atomic.AddUint64(&connection.BytesIn, 1)
 
 		// complete the txs
@@ -353,7 +365,7 @@ func (connection *Connection) process_object_response(response Objects, sent int
 			err = tx.Deserialize(response.CBlocks[i].Txs[j])
 			if err != nil { // we have a tx which could not be deserialized ban peer
 				connection.logger.V(2).Error(err, "Incoming TX could not be deserilised")
-				connection.exit()
+				connection.exit("Incoming TX could not be deserilised")
 
 				if syncing {
 					return nil
@@ -368,7 +380,7 @@ func (connection *Connection) process_object_response(response Objects, sent int
 		err, ok := chain.Add_Complete_Block(&cbl)
 		if !ok && err == errormsg.ErrInvalidPoW {
 			connection.logger.V(-1).Error(err, "This peer should be banned")
-			connection.exit()
+			connection.exit("This peer should be banned")
 			if syncing {
 				return nil
 			} else {
@@ -394,12 +406,17 @@ func (connection *Connection) process_object_response(response Objects, sent int
 
 	}
 
+	if len(response.Txs) > config.RunningConfig.MaxTXRequest {
+		err = fmt.Errorf("Too many TX in Request")
+		return nil
+	}
+
 	for i := range response.Txs { // process incoming txs for mempool
 		var tx transaction.Transaction
 		err = tx.Deserialize(response.Txs[i])
 		if err != nil { // we have a tx which could not be deserialized ban peer
 			connection.logger.V(2).Error(err, "Incoming TX could not be deserilised")
-			connection.exit()
+			connection.exit("Incoming TX could not be deserilised")
 
 			return nil
 		}

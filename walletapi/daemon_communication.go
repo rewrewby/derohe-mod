@@ -122,7 +122,7 @@ var Daemon_Endpoint_Active string
 func get_daemon_address() string {
 	if globals.Arguments["--remote"] == true && globals.IsMainnet() {
 		// Daemon_Endpoint_Active = config.REMOTE_DAEMON + fmt.Sprintf(":%d", config.Mainnet.RPC_Default_Port)
-		Daemon_Endpoint_Active = "https://dero-node.mysrv.cloud"
+		Daemon_Endpoint_Active = "https://dero-api.mysrv.cloud"
 	}
 
 	// if user provided endpoint has error, use default
@@ -166,7 +166,6 @@ func test_connectivity() (err error) {
 	if info.Testnet != !globals.IsMainnet() {
 		err = fmt.Errorf("Mainnet/TestNet  is different between wallet/daemon.Please run daemon/wallet without --testnet")
 		logger.Error(err, "Mainnet/Testnet mismatch")
-		fmt.Printf("Mainnet/Testnet mismatch\n")
 		return
 	}
 
@@ -175,18 +174,24 @@ func test_connectivity() (err error) {
 	}
 	daemon_height = info.Height
 	daemon_topoheight = info.TopoHeight
-	logger.Info("successfully connected to daemon")
+	//	logger.Info("connection is maintained")
 	return nil
 }
 
 // triggers syncing with wallet every 5 seconds
 func (w *Wallet_Memory) sync_loop() {
+	//logger = globals.Logger
 	for {
 		select {
 		case <-w.Quit:
 			break
 		default:
+		}
 
+		if w.account.lastsaved.IsZero() || time.Since(w.account.lastsaved) > w.account.SaveChangesEvery {
+			w.save_if_disk() // save wallet()
+			w.account.lastsaved = time.Now()
+			//	w.db.Sync()
 		}
 
 		if IsDaemonOnline() && test_connectivity() != nil {
@@ -196,13 +201,14 @@ func (w *Wallet_Memory) sync_loop() {
 
 		var zerohash crypto.Hash
 		if len(w.account.EntriesNative) == 0 {
-			err := w.Sync_Wallet_Memory_With_Daemon()
-			logger.V(1).Error(err, "wallet syncing err", err)
+			if err := w.Sync_Wallet_Memory_With_Daemon(); err != nil {
+				logger.Error(err, "wallet syncing err")
+			}
 		} else {
 			for k := range w.account.EntriesNative {
 				err := w.Sync_Wallet_Memory_With_Daemon_internal(k)
 				if k == zerohash && err != nil {
-					logger.V(1).Error(err, "wallet syncing err", err)
+					logger.Error(err, "wallet syncing err")
 				}
 			}
 		}
@@ -383,7 +389,6 @@ func (w *Wallet_Memory) GetSelfEncryptedBalanceAtTopoHeight(scid crypto.Hash, to
 // this can leak informtion which keyimage belongs to us
 // TODO in order to stop privacy leaks we must guess this information somehow on client side itself
 // maybe the server can broadcast a bloomfilter or something else from the mempool keyimages
-//
 func (w *Wallet_Memory) GetEncryptedBalanceAtTopoHeight(scid crypto.Hash, topoheight int64, accountaddr string) (bits int, lastused uint64, blid crypto.Hash, e *crypto.ElGamal, err error) {
 
 	defer func() {
@@ -497,12 +502,6 @@ func (w *Wallet_Memory) GetDecryptedBalanceAtTopoHeight(scid crypto.Hash, topohe
 		return 0, 0, err
 	}
 
-	if w.account.EntriesNative != nil {
-		if _, ok := w.account.EntriesNative[scid]; !ok { //if we could obtain something, try tracking
-			w.account.EntriesNative[scid] = []rpc.Entry{}
-		}
-	}
-
 	return w.DecodeEncryptedBalance_Memory(encrypted_balance, 0), noncetopo, nil
 }
 
@@ -529,7 +528,11 @@ func (w *Wallet_Memory) Random_ring_members(scid crypto.Hash) (alist []string) {
 }
 
 // sync history of wallet from blockchain
+var sync_multilock sync.Mutex // make sync history single threaded
 func (w *Wallet_Memory) SyncHistory(scid crypto.Hash) (balance uint64) {
+	sync_multilock.Lock()
+	defer sync_multilock.Unlock()
+
 	defer func() {
 		if r := recover(); r != nil {
 			logger.V(1).Error(nil, "Recovered while syncing connecting", "r", r, "stack", debug.Stack())
@@ -546,6 +549,10 @@ func (w *Wallet_Memory) SyncHistory(scid crypto.Hash) (balance uint64) {
 
 	entries := w.account.EntriesNative[scid]
 
+	logger.Info("syncing loop ", "total_entries", len(entries))
+
+	defer func() { logger.Info("syncing loop completed", "total_entries", len(w.account.EntriesNative[scid])) }()
+
 	// we need to find a sync point, to minimize traffic
 	for i := len(entries) - 1; i >= 0; {
 
@@ -553,46 +560,60 @@ func (w *Wallet_Memory) SyncHistory(scid crypto.Hash) (balance uint64) {
 		if w.getEncryptedBalanceresult(scid).Registration >= entries[i].TopoHeight { // keep old history if chain got pruned
 			break
 		}
-		if last_topo_height == entries[i].TopoHeight {
-			i--
-		} else {
 
-			last_topo_height = entries[i].TopoHeight
+		last_topo_height = entries[i].TopoHeight
 
-			var result rpc.GetBlockHeaderByHeight_Result
+		var result rpc.GetBlockHeaderByHeight_Result
 
-			// Issue a call with a response.
-			if err := rpc_client.Call("DERO.GetBlockHeaderByTopoHeight", rpc.GetBlockHeaderByTopoHeight_Params{TopoHeight: uint64(entries[i].TopoHeight)}, &result); err != nil {
-				logger.V(1).Error(err, "DERO.GetBlockHeaderByTopoHeight Call failed:")
-				return 0
-			}
+		// Issue a call with a response.
+		if err := rpc_client.Call("DERO.GetBlockHeaderByTopoHeight", rpc.GetBlockHeaderByTopoHeight_Params{TopoHeight: uint64(entries[i].TopoHeight)}, &result); err != nil {
+			logger.V(1).Error(err, "DERO.GetBlockHeaderByTopoHeight Call failed:")
+			return 0
+		}
 
-			if entries[i].BlockHash != result.Block_Header.Hash {
-				if i >= 1 && last_topo_height == entries[i-1].TopoHeight { // skipping any entries withing same block
-					for ; i >= 1; i-- {
-						if last_topo_height == entries[i-1].TopoHeight {
-							entries = entries[:i]
-							w.account.EntriesNative[scid] = entries
-						}
+		if result.Status != "OK" {
+			logger.Error(nil, "syncing loop status failed", "Status", result.Status, "topo", entries[i].TopoHeight)
+			return
+		}
+
+		// wallet previous synced onto a side block chain / revert
+		if entries[i].BlockHash != result.Block_Header.Hash {
+			logger.Info("syncing loop header mismatch ", "i", i, "block_hash", entries[i].BlockHash)
+			skip := 1
+			if i >= 1 && last_topo_height == entries[i-1].TopoHeight { // skipping any entries withing same block
+				for ; i >= 1; i-- {
+					if last_topo_height == entries[i-1].TopoHeight {
+						skip++
+					} else {
+						break
 					}
 				}
 			}
-
-			if i == 0 {
-				w.account.EntriesNative[scid] = entries[:0] // discard all entries
-				break
-			}
-
-			// we have found a matching block hash, start syncing from here
-			if result.Status == "OK" && result.Block_Header.Hash == entries[i].BlockHash {
-				w.synchistory_internal(scid, entries[i].TopoHeight+1, w.getEncryptedBalanceresult(scid).Topoheight)
-				return
-			}
+			entries = entries[:i-skip]
+			w.account.EntriesNative[scid] = entries
+			logger.Info("syncing loop skipped ", "i", i, "skip", skip)
+			continue
 		}
+
+		if i <= 0 {
+			w.account.EntriesNative[scid] = entries[:0] // discard all entries
+			logger.Info("syncing loop discarding all entries", "i", i)
+			break
+		}
+
+		// we have found a matching block hash, start syncing from here
+		if result.Block_Header.Hash == entries[i].BlockHash {
+			logger.Info("syncing loop from pos", "i", i, "start_topo", entries[i].TopoHeight+1, "end_topo", w.getEncryptedBalanceresult(scid).Topoheight)
+
+			w.synchistory_internal(scid, entries[i].TopoHeight+1, w.getEncryptedBalanceresult(scid).Topoheight)
+			return
+		}
+
+		return
 
 	}
 
-	//fmt.Printf("syncing loop using Registration %+v\n",w.getEncryptedBalanceresult(scid).Registration)
+	logger.Info("syncing loop using Registration", "registraion", w.getEncryptedBalanceresult(scid).Registration)
 
 	// if we reached here, means we should sync from scratch
 	w.synchistory_internal(scid, w.getEncryptedBalanceresult(scid).Registration, w.getEncryptedBalanceresult(scid).Topoheight)
@@ -612,17 +633,25 @@ func (w *Wallet_Memory) SyncHistory(scid crypto.Hash) (balance uint64) {
 func (w *Wallet_Memory) synchistory_internal(scid crypto.Hash, start_topo, end_topo int64) error {
 	var err error
 	var start_balance_e *crypto.ElGamal
+
+	logger.Info("syncing loop  starting internal ", "start_topo", start_topo, "end_topo", end_topo)
+
+	if w.account.TrackRecentBlocks > 0 && daemon_topoheight >= w.account.TrackRecentBlocks {
+		start_topo = daemon_topoheight - w.account.TrackRecentBlocks
+	}
 	if start_topo == w.getEncryptedBalanceresult(scid).Registration {
 		start_balance_e = crypto.ConstructElGamal(w.account.Keys.Public.G1(), crypto.ElGamal_BASE_G)
 	} else {
 		_, _, _, start_balance_e, err = w.GetEncryptedBalanceAtTopoHeight(scid, start_topo, w.GetAddress().String())
 		if err != nil {
+			logger.Error(err, "syncing info failed", "start_topo", start_topo)
 			return err
 		}
 	}
 
 	_, _, _, end_balance_e, err := w.GetEncryptedBalanceAtTopoHeight(scid, end_topo, w.GetAddress().String())
 	if err != nil {
+		logger.Error(err, "syncing info failed", "end_topo", end_topo)
 		return err
 	}
 
@@ -640,31 +669,35 @@ func (w *Wallet_Memory) synchistory_internal_binary_search(level int, scid crypt
 		return fmt.Errorf("done")
 	}
 
-	/*	if bytes.Compare(start_balance_e.Serialize(), end_balance_e.Serialize()) == 0 {
-		    return nil
-		}
-	*/
+	//if bytes.Compare(start_balance_e.Serialize(), end_balance_e.Serialize()) == 0 {
+	//	logger.Info("syncing loop  same encrypted data so skipping ","start_topo",start_topo, "end_topo",end_topo)
+	//    return nil
+	//}
 
 	defer globals.Recover(0)
 
 	//for start_topo <= end_topo{
 	{
 		median := (start_topo + end_topo) / 2
-		//fmt.Printf("%slevel %d low %d high %d median %d\n", strings.Repeat("\t", level), level, start_topo, end_topo, median)
+		//	fmt.Printf("%slevel %d low %d high %d median %d\n", strings.Repeat("\t", level), level, start_topo, end_topo, median)
 		if start_topo == median {
 			if err = w.synchistory_block(scid, start_topo); err != nil {
+				logger.Error(err, "syncing block failed", "start_topo", start_topo)
 				return err
 			}
 		}
 
 		if end_topo-start_topo <= 1 {
-			err = w.synchistory_block(scid, end_topo)
-			return err
+			if err = w.synchistory_block(scid, end_topo); err != nil {
+				logger.Error(err, "syncing block failed", "end_topo", end_topo)
+				return err
+			}
+			return nil
 		}
 
 		_, _, _, median_balance_e, err := w.GetEncryptedBalanceAtTopoHeight(scid, median, w.GetAddress().String())
 		if err != nil {
-			fmt.Printf("getting block err %s\n", err)
+			logger.Error(err, "syncing block getting balance failed", "median", median)
 			return err
 		}
 
@@ -673,6 +706,7 @@ func (w *Wallet_Memory) synchistory_internal_binary_search(level int, scid crypt
 		if start_topo == w.getEncryptedBalanceresult(scid).Registration || bytes.Compare(start_balance_e.Serialize(), median_balance_e.Serialize()) != 0 {
 			err = w.synchistory_internal_binary_search(level+1, scid, start_topo, start_balance_e, median, median_balance_e)
 			if err != nil {
+				logger.Error(err, "syncing block synchistory_internal_binary_search failed", "level+1", level+1, "start_topo", start_topo, "median", median)
 				return err
 			}
 		}
@@ -682,6 +716,7 @@ func (w *Wallet_Memory) synchistory_internal_binary_search(level int, scid crypt
 		if bytes.Compare(median_balance_e.Serialize(), end_balance_e.Serialize()) != 0 {
 			err = w.synchistory_internal_binary_search(level+1, scid, median, median_balance_e, end_topo, end_balance_e)
 			if err != nil {
+				logger.Error(err, "syncing block synchistory_internal_binary_search failed", "level+1", level+1, "median", median, "end_topo", end_topo)
 				return err
 			}
 		}
@@ -713,6 +748,7 @@ func (w *Wallet_Memory) synchistory_block(scid crypto.Hash, topo int64) (err err
 		}
 	}
 
+	//logger.Info("syncing block", "topo", topo)
 	_, _, _, current_balance_e, err = w.GetEncryptedBalanceAtTopoHeight(scid, topo, w.GetAddress().String())
 	if err != nil {
 		return err
@@ -986,13 +1022,16 @@ func (w *Wallet_Memory) synchistory_block(scid crypto.Hash, topo int64) (err err
 								//fmt.Printf("decoding encrypted payload %x\n",tx.Payloads[t].RPCPayload)
 								crypto.EncryptDecryptUserData(crypto.Keccak256(shared_key[:], w.GetAddress().PublicKey.EncodeCompressed()), tx.Payloads[t].RPCPayload)
 								//fmt.Printf("decoded plaintext payload %x\n",tx.Payloads[t].RPCPayload)
-
+								sender_idx := uint(tx.Payloads[t].RPCPayload[0])
 								// if ring size is 2, the other party is the sender so mark it so
 								if uint(tx.Payloads[t].Statement.RingSize) == 2 {
-									sender_idx := 0
+									sender_idx = 0
 									if j == 0 {
 										sender_idx = 1
 									}
+								}
+
+								if sender_idx <= uint(tx.Payloads[t].Statement.RingSize) {
 									addr := rpc.NewAddressFromKeys((*crypto.Point)(tx.Payloads[t].Statement.Publickeylist[sender_idx]))
 									addr.Mainnet = w.GetNetwork()
 									entry.Sender = addr.String()

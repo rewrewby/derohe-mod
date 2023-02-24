@@ -138,40 +138,56 @@ var Testnet = CHAIN_CONFIG{Name: "testnet", // testnet will always have last 3 b
 }
 
 // mainnet has a remote daemon node, which can be used be default, if user provides a  --remote flag
-const REMOTE_DAEMON = "89.38.99.117" // "https://rwallet.dero.live"
+// const REMOTE_DAEMON = "89.38.99.117" // "https://rwallet.dero.live"
 
 type RUN_CONFIG struct {
-	WhitelistIncoming      bool
-	LogLevel               int8
-	OperatorName           string
-	P2PTurbo               bool
-	P2PBWFactor            int64
-	GETWorkJobDispatchTime time.Duration
-	DiagnosticCheckDelay   int64
-	BlockRejectThreshold   int64
-	PeerLatencyThreshold   time.Duration
-	OnlyTrusted            bool
-	Min_Peers              int64
-	Max_Peers              int64
-	BlockedVersions        []string
-	ErrorLogExpirySeconds  int64
-	NodeTag                string
-	NetworkStatsKeepCount  int64
+	WhitelistIncoming       bool
+	LogLevel                int8
+	OperatorName            string
+	P2PTurbo                bool
+	P2PBWFactor             int64
+	GETWorkJobDispatchTime  time.Duration
+	DiagnosticCheckDelay    int64
+	BlockRejectThreshold    int64
+	PeerLatencyThreshold    time.Duration
+	OnlyTrusted             bool
+	Min_Peers               int64
+	Max_Peers               int64
+	BlockedVersions         []string
+	ErrorLogExpirySeconds   int64
+	NodeTag                 string
+	NetworkStatsKeepCount   int64
+	AntiCheat               bool
+	TraceBlocks             bool
+	TraceTx                 bool
+	MinerMaintenanceMessage string
+	VariableDispatchTime    bool
+	TraceNewConnections     bool
+	MinerLatency            int
+	MaxTXRequest            int
 }
 
 var RunningConfig = RUN_CONFIG{
-	WhitelistIncoming:      false,
-	LogLevel:               0,
-	OperatorName:           "Hansen33",
-	P2PTurbo:               true,
-	P2PBWFactor:            2,
-	DiagnosticCheckDelay:   3600,
-	BlockRejectThreshold:   80,
-	PeerLatencyThreshold:   time.Duration(2000 * time.Millisecond),
-	GETWorkJobDispatchTime: time.Duration(500 * time.Millisecond),
-	OnlyTrusted:            false,
-	ErrorLogExpirySeconds:  600,
-	Min_Peers:              31,
-	Max_Peers:              101,
-	NetworkStatsKeepCount:  100,
+	WhitelistIncoming:       false,
+	LogLevel:                0,
+	OperatorName:            "Hansen33",
+	P2PTurbo:                true,
+	P2PBWFactor:             2,
+	DiagnosticCheckDelay:    3600,
+	BlockRejectThreshold:    80,
+	PeerLatencyThreshold:    time.Duration(2000 * time.Millisecond),
+	GETWorkJobDispatchTime:  time.Duration(500 * time.Millisecond),
+	VariableDispatchTime:    false,
+	OnlyTrusted:             false,
+	ErrorLogExpirySeconds:   600,
+	Min_Peers:               100,
+	Max_Peers:               350,
+	NetworkStatsKeepCount:   4800,
+	AntiCheat:               true,
+	TraceBlocks:             true,
+	TraceTx:                 true,
+	TraceNewConnections:     true,
+	MinerMaintenanceMessage: "System will go down for maintenance shortly",
+	MinerLatency:            100,
+	MaxTXRequest:            100,
 }

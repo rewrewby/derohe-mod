@@ -74,19 +74,21 @@ Usage:
   --restore-deterministic-wallet    Restore wallet from previously saved recovery seed
   --electrum-seed=<recovery-seed>   Seed to use while restoring wallet
   --socks-proxy=<socks_ip:port>  Use a proxy to connect to Daemon.
-  --remote      use hard coded remote daemon https://dero-node.mysrv.cloud
+  --remote      use hard coded remote daemon https://dero-api.mysrv.cloud
   --daemon-address=<host:port>    Use daemon instance at <host>:<port> or https://domain
   --rpc-server      Run rpc server, so wallet is accessible using api
   --rpc-bind=<127.0.0.1:20209>  Wallet binds on this ip address and port
   --rpc-login=<username:password>  RPC server will grant access based on these credentials
   --allow-rpc-password-change   RPC server will change password if you send "Pass" header with new password
+  --scan-top-n-blocks=<100000>  Only scan top N blocks
+  --save-every-x-seconds=<300>  Save wallet every x seconds
   `
 var menu_mode bool = true // default display menu mode
-//var account_valid bool = false                        // if an account has been opened, do not allow to create new account in this session
+// var account_valid bool = false                        // if an account has been opened, do not allow to create new account in this session
 var offline_mode bool             // whether we are in offline mode
 var sync_in_progress int          //  whether sync is in progress with daemon
 var wallet *walletapi.Wallet_Disk //= &walletapi.Account{} // all account  data is available here
-//var address string
+// var address string
 var sync_time time.Time // used to suitable update  prompt
 
 var default_offline_datafile string = "getoutputs.bin"
@@ -154,10 +156,17 @@ func main() {
 	l.Refresh() // refresh the prompt
 
 	// parse arguments and setup logging , print basic information
-	exename, _ := os.Executable()
-	f, err := os.Create(exename + ".log")
+	dirname, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Printf("Error while opening log file err: %s filename %s\n", err, exename+".log")
+		fmt.Print("Error: could not find user home directory ")
+
+	}
+
+	filename := dirname + "/" + os.Args[0] + ".log"
+
+	f, err := os.Create(filename)
+	if err != nil {
+		fmt.Printf("Error while opening log file %s (%s)\n", filename, err)
 		return
 	}
 	globals.InitializeLog(l.Stdout(), f)

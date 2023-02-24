@@ -59,6 +59,7 @@ type MiniBlockLog struct {
 	NodeAddress string
 	MinerWallet string
 	IsOrphan    bool
+	SentTime    int64
 }
 
 var MiniblockLogs = make(map[string]MiniBlockLog)
@@ -68,6 +69,7 @@ type FinalBlockLog struct {
 	NodeAddress string
 	MinerWallet string
 	IsOrphan    bool
+	SentTime    int64
 }
 
 var FinalBlockLogs = make(map[string]FinalBlockLog)
@@ -82,6 +84,230 @@ var SelfishNodeStats = make(map[string][]MyBlockReceivingError)
 
 var log_miniblock_mutex sync.Mutex
 
+var MyMiniBlocks = make(map[string][]block.MiniBlock)
+
+var miner_mini_mutex sync.Mutex
+
+func AddBlockToMyCollection(mbl block.MiniBlock, miner string) {
+
+	miner_mini_mutex.Lock()
+	MyMiniBlocks[miner] = append(MyMiniBlocks[miner], mbl)
+	miner_mini_mutex.Unlock()
+
+	if !mbl.Final {
+		log_miniblock_mutex.Lock()
+		defer log_miniblock_mutex.Unlock()
+
+		MiniblockHash := fmt.Sprintf("%s", mbl.GetHash())
+		stat, found := MiniblockLogs[MiniblockHash]
+
+		if !found {
+			MinerWallet := GetMinerAddressFromKeyHash(chain, mbl)
+			stat.MinerWallet = MinerWallet
+			stat.Miniblock = mbl
+			stat.NodeAddress = "127.0.0.1"
+
+			MiniblockLogs[MiniblockHash] = stat
+
+			globals.ForeignMiniFoundTime_lock.Lock()
+			defer globals.ForeignMiniFoundTime_lock.Unlock()
+			globals.ForeignMiniFoundTime[MinerWallet] = append(globals.ForeignMiniFoundTime[MinerWallet], time.Now().Unix())
+
+		}
+	}
+}
+
+func GetMyBlocksCollection() map[string][]block.MiniBlock {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+
+	var CopyOfMyMiniBlocks = make(map[string][]block.MiniBlock)
+
+	for miner, _ := range MyMiniBlocks {
+		CopyOfMyMiniBlocks[miner] = append(CopyOfMyMiniBlocks[miner], MyMiniBlocks[miner]...)
+	}
+
+	return CopyOfMyMiniBlocks
+}
+
+var orphan_block_mutex sync.Mutex
+var OrphanHeightCount = make(map[uint64]int)
+var OrphanMiniBlocks = make(map[string][]block.MiniBlock)
+var OrphanBlocks = make(map[string][]block.MiniBlock)
+var OrphanFullBlocks = make(map[string][]block.Complete_Block)
+var MyOrphanMiniBlocks = make(map[string][]block.MiniBlock)
+var MyOrphanBlocks = make(map[string][]block.MiniBlock)
+
+func AddBlockToOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+
+	list, list_found := OrphanMiniBlocks[miner]
+	if !list_found {
+		OrphanMiniBlocks[miner] = append(OrphanMiniBlocks[miner], mbl)
+		i := OrphanHeightCount[mbl.Height]
+		i++
+		OrphanHeightCount[mbl.Height] = i
+		return
+	}
+
+	found := false
+	for _, block := range list {
+		if block.GetHash() == mbl.GetHash() {
+			found = true
+		}
+	}
+
+	if !found {
+		OrphanMiniBlocks[miner] = append(OrphanMiniBlocks[miner], mbl)
+		i := OrphanHeightCount[mbl.Height]
+		i++
+		OrphanHeightCount[mbl.Height] = i
+		return
+	}
+
+}
+
+func AddBlockToOrphanBlockCollection(bl block.MiniBlock, miner string) {
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+	OrphanBlocks[miner] = append(OrphanBlocks[miner], bl)
+
+	i := OrphanHeightCount[bl.Height]
+	i++
+	OrphanHeightCount[bl.Height] = i
+}
+
+func AddBlockToMyOrphanMiniBlockCollection(mbl block.MiniBlock, miner string) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+	MyOrphanMiniBlocks[miner] = append(MyOrphanMiniBlocks[miner], mbl)
+
+	go AddBlockToOrphanMiniBlockCollection(mbl, miner)
+}
+
+func AddBlockToMyOrphanBlockCollection(mbl block.MiniBlock, miner string) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+	MyOrphanBlocks[miner] = append(MyOrphanBlocks[miner], mbl)
+
+	go AddBlockToOrphanBlockCollection(mbl, miner)
+}
+
+func CountNetworkOrphanSince(height uint64) (total int) {
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+
+	for count_height, count := range OrphanHeightCount {
+		if count_height >= height {
+			total += count
+		}
+	}
+
+	return total
+}
+
+func GetMinerOrphanCount(miner string) (int, int) {
+	miner_mini_mutex.Lock()
+	defer miner_mini_mutex.Unlock()
+
+	ib, mb := 0, 0
+	_, found_mb := MyOrphanMiniBlocks[miner]
+	if found_mb {
+		mb += len(MyOrphanMiniBlocks[miner])
+	}
+
+	_, found_ib := MyOrphanBlocks[miner]
+	if found_ib {
+		ib += len(MyOrphanBlocks[miner])
+	}
+
+	return ib, mb
+}
+
+func IsMiniBlockOrphan(mbl block.MiniBlock) bool {
+	orphan_block_mutex.Lock()
+	defer orphan_block_mutex.Unlock()
+
+	for miner, _ := range OrphanMiniBlocks {
+		for _, orphan := range OrphanMiniBlocks[miner] {
+			if orphan == mbl {
+				return true
+			}
+		}
+	}
+	for miner, _ := range OrphanBlocks {
+		for _, orphan := range OrphanBlocks[miner] {
+			if orphan == mbl {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// 	AddBlockToMyCollection(mblData, miner)
+
+func HasBlocksFromCount() int64 {
+
+	log_miniblock_mutex.Lock()
+	defer log_miniblock_mutex.Unlock()
+
+	height := chain.Get_Height()
+	lowest_height := height
+
+	for _, mbl := range MiniblockLogs {
+		if mbl.Miniblock.Height < uint64(lowest_height) {
+			lowest_height = int64(mbl.Miniblock.Height)
+		}
+	}
+
+	for _, bl := range FinalBlockLogs {
+		if bl.Block.Height < uint64(lowest_height) {
+			lowest_height = int64(bl.Block.Height)
+		}
+	}
+
+	return height - lowest_height
+}
+
+func UpdateLiveBlockData() {
+
+	log_miniblock_mutex.Lock()
+	defer log_miniblock_mutex.Unlock()
+
+	for key, mbl := range MiniblockLogs {
+
+		if mbl.Miniblock.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
+			delete(MiniblockLogs, key)
+			continue
+		}
+
+		if IsMiniBlockOrphan(mbl.Miniblock) {
+			mbl.IsOrphan = true
+		} else {
+			mbl.IsOrphan = false
+		}
+		MiniblockLogs[key] = mbl
+	}
+
+	for key, bl := range FinalBlockLogs {
+
+		if bl.Block.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
+			delete(FinalBlockLogs, key)
+			continue
+		}
+
+		if IsMiniBlockOrphan(bl.Block.MiniBlocks[9]) {
+			bl.IsOrphan = true
+		} else {
+			bl.IsOrphan = false
+		}
+		FinalBlockLogs[key] = bl
+
+	}
+}
+
 func GetBlockLogLenght() (int, int) {
 
 	log_miniblock_mutex.Lock()
@@ -92,6 +318,16 @@ func GetBlockLogLenght() (int, int) {
 
 	return ib, mb
 
+}
+
+func GetIntegratorAddressFromKeyHash(chain *blockchain.Blockchain, bl block.Block) string {
+
+	if addr, err1 := rpc.NewAddressFromCompressedKeys(bl.Miner_TX.MinerAddress[:]); err1 == nil {
+		addr.Mainnet = globals.IsMainnet()
+		return addr.String()
+	}
+
+	return ""
 }
 
 func GetMinerAddressFromKeyHash(chain *blockchain.Blockchain, mbl block.MiniBlock) string {
@@ -186,7 +422,7 @@ func PotentialNodeIntegratorsFromHeight(height int64, Address string) ([]string,
 	}
 
 	sort.SliceStable(ordered_miners, func(i, j int) bool {
-		return likelyhood_score[ordered_miners[i]] > likelyhood_score[ordered_miners[j]]
+		return NodeWallets[ordered_miners[i]] > NodeWallets[ordered_miners[j]]
 	})
 
 	var data = make(map[string]map[string]float64)
@@ -218,6 +454,7 @@ func PotentialMinersOnNodeFromHeight(height int64, Address string) ([]string, ma
 	var Minis = make(map[string]int)
 	var Finals = make(map[string]int)
 	var Orphans = make(map[string]int)
+	var Total = make(map[string]int)
 
 	for _, bl := range FinalBlockLogs {
 		if bl.Block.Height >= uint64(height) {
@@ -229,6 +466,7 @@ func PotentialMinersOnNodeFromHeight(height int64, Address string) ([]string, ma
 				if bl.IsOrphan {
 					Orphans[bl.MinerWallet]++
 				}
+				Total[bl.MinerWallet]++
 			}
 		}
 	}
@@ -243,6 +481,7 @@ func PotentialMinersOnNodeFromHeight(height int64, Address string) ([]string, ma
 				if mbl.IsOrphan {
 					Orphans[mbl.MinerWallet]++
 				}
+				Total[mbl.MinerWallet]++
 			}
 		}
 	}
@@ -255,7 +494,7 @@ func PotentialMinersOnNodeFromHeight(height int64, Address string) ([]string, ma
 	}
 
 	sort.SliceStable(ordered_miners, func(i, j int) bool {
-		return likelyhood_score[ordered_miners[i]] > likelyhood_score[ordered_miners[j]]
+		return Total[ordered_miners[i]] > Total[ordered_miners[j]]
 	})
 
 	var data = make(map[string]map[string]float64)
@@ -279,45 +518,15 @@ func PotentialMinersOnNodeFromHeight(height int64, Address string) ([]string, ma
 	return ordered_miners, data
 }
 
-func UpdateLiveBlockData() {
-
-	log_miniblock_mutex.Lock()
-	defer log_miniblock_mutex.Unlock()
-
-	for key, mbl := range MiniblockLogs {
-
-		if mbl.Miniblock.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
-			delete(MiniblockLogs, key)
-			continue
-		}
-
-		if block.IsBlockOrphan(mbl.Miniblock.GetHash().String()) {
-			mbl.IsOrphan = true
-		} else {
-			mbl.IsOrphan = false
-		}
-		MiniblockLogs[key] = mbl
-	}
-
-	for key, bl := range FinalBlockLogs {
-
-		if bl.Block.Height+uint64(config.RunningConfig.NetworkStatsKeepCount) < uint64(chain.Get_Height()) {
-			delete(FinalBlockLogs, key)
-			continue
-		}
-
-		if block.IsBlockOrphan(bl.Block.GetHash().String()) {
-			bl.IsOrphan = true
-		} else {
-			bl.IsOrphan = false
-		}
-		FinalBlockLogs[key] = bl
-
-	}
-
+type MinerNodeData struct {
+	LikeHoodScore float64
+	TotalMinis    int
+	TotalFinals   int
+	IBOs          int
+	MBOs          int
 }
 
-func PotentialMinerNodeHeight(height int64, Wallet string) ([]string, map[string]map[string]float64) {
+func PotentialMinerNodeHeight(height int64, Wallet string) ([]string, map[string]MinerNodeData) {
 	log_miniblock_mutex.Lock()
 	defer log_miniblock_mutex.Unlock()
 
@@ -325,7 +534,9 @@ func PotentialMinerNodeHeight(height int64, Wallet string) ([]string, map[string
 	var Nodes = make(map[string]int)
 	var Minis = make(map[string]int)
 	var Finals = make(map[string]int)
-	var Orphans = make(map[string]int)
+	var IBOs = make(map[string]int)
+	var MBOs = make(map[string]int)
+	var Total = make(map[string]int)
 
 	for _, bl := range FinalBlockLogs {
 		if bl.Block.Height >= uint64(height) && bl.MinerWallet == Wallet {
@@ -333,8 +544,9 @@ func PotentialMinerNodeHeight(height int64, Wallet string) ([]string, map[string
 			Wallets[bl.MinerWallet]++
 			Finals[bl.NodeAddress]++
 			if bl.IsOrphan {
-				Orphans[bl.NodeAddress]++
+				IBOs[bl.NodeAddress]++
 			}
+			Total[bl.NodeAddress]++
 		}
 	}
 
@@ -344,9 +556,9 @@ func PotentialMinerNodeHeight(height int64, Wallet string) ([]string, map[string
 			Nodes[mbl.NodeAddress]++
 			Minis[mbl.NodeAddress]++
 			if mbl.IsOrphan {
-				Orphans[mbl.NodeAddress]++
+				MBOs[mbl.NodeAddress]++
 			}
-
+			Total[mbl.NodeAddress]++
 		}
 	}
 
@@ -358,24 +570,19 @@ func PotentialMinerNodeHeight(height int64, Wallet string) ([]string, map[string
 	}
 
 	sort.SliceStable(ordered_nodes, func(i, j int) bool {
-		return likelyhood_score[ordered_nodes[i]] > likelyhood_score[ordered_nodes[j]]
+		return Total[ordered_nodes[i]] > Total[ordered_nodes[j]]
 	})
 
-	var data = make(map[string]map[string]float64)
+	var data = make(map[string]MinerNodeData)
 
 	for node := range likelyhood_score {
 
-		_, found := data[node]
-		if !found {
-			data[node] = make(map[string]float64)
-		}
-
 		d := data[node]
-		d["likelyhood"] = likelyhood_score[node]
-		d["minis"] = float64(Minis[node])
-		d["finals"] = float64(Finals[node])
-		d["orphans"] = float64(Orphans[node])
-
+		d.LikeHoodScore = likelyhood_score[node]
+		d.TotalMinis = Minis[node]
+		d.TotalFinals = Finals[node]
+		d.IBOs = IBOs[node]
+		d.MBOs = MBOs[node]
 		data[node] = d
 	}
 
@@ -436,6 +643,7 @@ func GetActiveMinersFromHeight(height int64) map[string]map[string]int {
 			stat["total"]++
 
 			if bl.IsOrphan {
+				stat["ibo"]++
 				stat["orphans"]++
 			}
 			ActiveMiners[bl.MinerWallet] = stat
@@ -454,6 +662,7 @@ func GetActiveMinersFromHeight(height int64) map[string]map[string]int {
 			stat["total"]++
 
 			if mbl.IsOrphan {
+				stat["mbo"]++
 				stat["orphans"]++
 			}
 
@@ -543,7 +752,7 @@ func GetMiniBlocksFromHeight(height uint64) map[string]MiniBlockLog {
 
 }
 
-func LogFinalBlock(bl block.Block, Address string) {
+func LogFinalBlock(bl block.Block, Address string, sent int64) {
 
 	log_miniblock_mutex.Lock()
 	defer log_miniblock_mutex.Unlock()
@@ -553,7 +762,7 @@ func LogFinalBlock(bl block.Block, Address string) {
 
 	stat, found := FinalBlockLogs[BlockHash]
 
-	if !found {
+	if !found || stat.SentTime > sent {
 
 		if MinerWallet, err1 := rpc.NewAddressFromCompressedKeys(bl.Miner_TX.MinerAddress[:]); err1 == nil {
 			stat.MinerWallet = MinerWallet.String()
@@ -566,9 +775,7 @@ func LogFinalBlock(bl block.Block, Address string) {
 
 }
 
-var last_mining_time uint16
-
-func LogMiniblock(mbl block.MiniBlock, Address string) {
+func LogMiniblock(mbl block.MiniBlock, Address string, sent int64) {
 
 	log_miniblock_mutex.Lock()
 	defer log_miniblock_mutex.Unlock()
@@ -578,17 +785,16 @@ func LogMiniblock(mbl block.MiniBlock, Address string) {
 
 	stat, found := MiniblockLogs[MiniblockHash]
 
-	if !found {
+	if !found || stat.SentTime >= sent {
 
 		MinerWallet := GetMinerAddressFromKeyHash(chain, mbl)
 		stat.MinerWallet = MinerWallet
 		stat.Miniblock = mbl
 		stat.NodeAddress = Address
+		stat.SentTime = sent
 
 		MiniblockLogs[MiniblockHash] = stat
-
 	}
-
 }
 
 func LogAccept(Address string) {
@@ -810,15 +1016,6 @@ func PeerLogConnectionFail(Address string, Block_Type string, PeerID uint64, Mes
 		stat = append(stat, Error)
 
 		peer.Sending_Errors = stat
-	}
-
-	context_deadline := regexp.MustCompile("^context deadline exceeded")
-	// If errors showing connection error, then log this so peer can get cleaned up
-	connection_down := regexp.MustCompile("^connection is shut down")
-	closed_pipe := regexp.MustCompile("io: read/write on closed pipe")
-
-	if connection_down.Match([]byte(Message)) || closed_pipe.Match([]byte(Message)) || context_deadline.Match([]byte(Message)) {
-		go Peer_SetFail(Address)
 	}
 
 	Pstat[Address] = peer

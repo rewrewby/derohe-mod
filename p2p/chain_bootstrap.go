@@ -16,24 +16,22 @@
 
 package p2p
 
-import "fmt"
+import (
+	"encoding/binary"
+	"fmt"
+	"math/big"
+	"math/bits"
+	"sync/atomic"
+	"time"
 
-//import "net"
-import "time"
-import "math/big"
-import "math/bits"
-import "sync/atomic"
-import "encoding/binary"
-
-import "github.com/deroproject/derohe/config"
-import "github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/block"
+	"github.com/deroproject/derohe/config"
+	"github.com/deroproject/derohe/cryptography/crypto" //import "net"
+	"github.com/deroproject/derohe/transaction"
+	"github.com/deroproject/graviton"
+)
 
 //import "github.com/deroproject/derohe/errormsg"
-import "github.com/deroproject/derohe/transaction"
-
-import "github.com/deroproject/graviton"
-
-import "github.com/deroproject/derohe/cryptography/crypto"
 
 //import "github.com/deroproject/derosuite/blockchain"
 
@@ -104,7 +102,7 @@ func (connection *Connection) bootstrap_chain() {
 			binary.BigEndian.PutUint64(section[:], bits.Reverse64(uint64(i))) // place reverse path
 			ts_request := Request_Tree_Section_Struct{Topo: request.TopoHeights[0], TreeName: []byte(config.BALANCE_TREE), Section: section[:], SectionLength: uint64(path_length)}
 			var ts_response Response_Tree_Section_Struct
-			fill_common(&ts_response.Common)
+			fill_common(&ts_request.Common)
 			if err := connection.Client.Call("Peer.TreeSection", ts_request, &ts_response); err != nil {
 				connection.logger.V(1).Error(err, "Call failed TreeSection")
 				return
@@ -119,7 +117,7 @@ func (connection *Connection) bootstrap_chain() {
 
 				if len(ts_response.Keys) != len(ts_response.Values) {
 					//rlog.Warnf("Incoming Key count %d value count %d \"%s\" ", len(ts_response.Keys), len(ts_response.Values), globals.CTXString(connection.logger))
-					connection.exit()
+					connection.exit("Wrong key count")
 					return
 				}
 				//rlog.Debugf("chunk %d Will write %d keys\n", i, len(ts_response.Keys))
@@ -168,7 +166,7 @@ func (connection *Connection) bootstrap_chain() {
 			binary.BigEndian.PutUint64(section[:], bits.Reverse64(uint64(i))) // place reverse path
 			ts_request := Request_Tree_Section_Struct{Topo: request.TopoHeights[0], TreeName: []byte(config.SC_META), Section: section[:], SectionLength: uint64(path_length)}
 			var ts_response Response_Tree_Section_Struct
-			fill_common(&ts_response.Common)
+			fill_common(&ts_request.Common)
 			if err := connection.Client.Call("Peer.TreeSection", ts_request, &ts_response); err != nil {
 				connection.logger.V(1).Error(err, "Call failed TreeSection")
 				return
@@ -186,7 +184,7 @@ func (connection *Connection) bootstrap_chain() {
 
 				if len(ts_response.Keys) != len(ts_response.Values) {
 					//rlog.Warnf("Incoming Key count %d value count %d \"%s\" ", len(ts_response.Keys), len(ts_response.Values), globals.CTXString(connection.logger))
-					connection.exit()
+					connection.exit("Wrong key count")
 					return
 				}
 				//rlog.Debugf("SC chunk %d Will write %d keys\n", i, len(ts_response.Keys))
@@ -198,21 +196,58 @@ func (connection *Connection) bootstrap_chain() {
 
 					sc_request := Request_Tree_Section_Struct{Topo: request.TopoHeights[0], TreeName: ts_response.Keys[j], Section: section[:], SectionLength: uint64(0)}
 					var sc_response Response_Tree_Section_Struct
-					fill_common(&sc_response.Common)
+					fill_common(&sc_request.Common)
 					if err := connection.Client.Call("Peer.TreeSection", sc_request, &sc_response); err != nil {
 						connection.logger.V(1).Error(err, "Call failed TreeSection")
 						return
 					} else {
+
 						var sc_data_tree *graviton.Tree
 						if sc_data_tree, err = ss.GetTree(string(ts_response.Keys[j])); err != nil {
 							panic(err)
-						} else {
-							for j := range sc_response.Keys {
-								sc_data_tree.Put(sc_response.Keys[j], sc_response.Values[j])
+						} else if sc_response.KeyCount < 4096 {
+							for k := range sc_response.Keys {
+								sc_data_tree.Put(sc_response.Keys[k], sc_response.Values[k])
 							}
-							changed_trees = append(changed_trees, sc_data_tree)
+						} else { // tree is a huge tree, get it in chunks
+							sc_chunks_estm := sc_response.KeyCount / chunksize
+							sc_chunks := int64(1) // chunks need to be in power of 2
+							sc_path_length := 0
+							for sc_chunks < sc_chunks_estm {
+								sc_chunks = sc_chunks * 2
+								sc_path_length++
+							}
 
+							if sc_chunks < 2 {
+								sc_chunks = 2
+								sc_path_length = 1
+							}
+
+							var sc_section [8]byte
+							for k := int64(0); k < sc_chunks; k++ {
+								binary.BigEndian.PutUint64(sc_section[:], bits.Reverse64(uint64(k))) // place reverse path
+								sc_ts_request := Request_Tree_Section_Struct{Topo: request.TopoHeights[0], TreeName: ts_response.Keys[j], Section: sc_section[:], SectionLength: uint64(sc_path_length)}
+								var sc_ts_response Response_Tree_Section_Struct
+								fill_common(&sc_ts_request.Common)
+								if err := connection.Client.Call("Peer.TreeSection", sc_ts_request, &sc_ts_response); err != nil {
+									connection.logger.V(1).Error(err, "Call failed TreeSection")
+									return
+								} else { // request was successfull
+
+									if len(sc_ts_response.Keys) != len(sc_ts_response.Values) {
+										connection.logger.V(1).Error(nil, "Wrong key/values", "Keycount", len(sc_ts_response.Keys), "valuecount", len(sc_ts_response.Values))
+										connection.exit("Wrong key/values")
+										return
+									}
+									//fmt.Printf("writing SC chunk %d/%d (%d)  writing %d keys %x\n", k, sc_chunks, sc_response.KeyCount, len(sc_ts_response.Keys), ts_response.Keys[j])
+									for l := range sc_ts_response.Keys {
+										sc_data_tree.Put(sc_ts_response.Keys[l], sc_ts_response.Values[l])
+									}
+								}
+
+							}
 						}
+						changed_trees = append(changed_trees, sc_data_tree)
 
 					}
 
@@ -237,6 +272,7 @@ func (connection *Connection) bootstrap_chain() {
 	for i := int64(0); i <= request.TopoHeights[0]; i++ {
 		chain.Store.Topo_store.Write(i, zerohash, commit_version, 0) // commit everything
 	}
+	chain.Store.Topo_store.Sync()
 
 	for i := range response.CBlocks { // we must store the blocks
 
@@ -247,7 +283,7 @@ func (connection *Connection) bootstrap_chain() {
 		err := bl.Deserialize(response.CBlocks[i].Block)
 		if err != nil { // we have a block which could not be deserialized ban peer
 			connection.logger.Error(err, "Error Incoming block could not be deserialised.")
-			connection.exit()
+			connection.exit("Error Incoming block could not be deserialised")
 			return
 		}
 
@@ -265,12 +301,12 @@ func (connection *Connection) bootstrap_chain() {
 			err = tx.Deserialize(response.CBlocks[i].Txs[j])
 			if err != nil { // we have a tx which could not be deserialized ban peer
 				connection.logger.Error(err, "Error Incoming TX could not be deserialized")
-				connection.exit()
+				connection.exit("Error Incoming block could not be deserialised")
 				return
 			}
 			if bl.Tx_hashes[j] != tx.GetHash() {
 				connection.logger.Error(err, "Error Incoming TX has mismatch.")
-				connection.exit()
+				connection.exit("Error Incoming TX has mismatch")
 				return
 			}
 
@@ -288,7 +324,7 @@ func (connection *Connection) bootstrap_chain() {
 		diff := new(big.Int)
 		if _, ok := diff.SetString(response.CBlocks[i].Difficulty, 10); !ok { // if Cumulative_Difficulty could not be parsed, kill connection
 			connection.logger.Error(fmt.Errorf("Could not Parse Difficulty in common"), "", "diff", response.CBlocks[i].Difficulty)
-			connection.exit()
+			connection.exit("Could not Parse Difficulty in common")
 			return
 		}
 

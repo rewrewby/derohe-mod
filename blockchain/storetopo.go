@@ -37,7 +37,8 @@ const TOPORECORD_SIZE int64 = 48
 
 // this file implements a filesystem store which is used to store topo to block mapping directly in the file system and the state version directly tied
 type storetopofs struct {
-	topomapping *os.File
+	topomapping        *os.File
+	last_state_version uint64
 }
 
 func (s TopoRecord) String() string {
@@ -78,12 +79,14 @@ func (s *storetopofs) Read(index int64) (TopoRecord, error) {
 	copy(record.BLOCK_ID[:], buf[:])
 	record.State_Version = binary.LittleEndian.Uint64(buf[len(record.BLOCK_ID):])
 	record.Height = int64(binary.LittleEndian.Uint64(buf[len(record.BLOCK_ID)+8:]))
+
 	return record, nil
 }
 
 func (s *storetopofs) Write(index int64, blid [32]byte, state_version uint64, height int64) (err error) {
 	var buf [TOPORECORD_SIZE]byte
 	var record TopoRecord
+	var zero_hash [32]byte
 
 	copy(buf[:], blid[:])
 	binary.LittleEndian.PutUint64(buf[len(record.BLOCK_ID):], state_version)
@@ -92,10 +95,17 @@ func (s *storetopofs) Write(index int64, blid [32]byte, state_version uint64, he
 	binary.LittleEndian.PutUint64(buf[len(record.BLOCK_ID)+8:], uint64(height))
 
 	_, err = s.topomapping.WriteAt(buf[:], index*TOPORECORD_SIZE)
-
-	s.topomapping.Sync() // looks like this is the cause of corruption
+	if s.last_state_version != state_version || state_version == 0 {
+		if blid != zero_hash { // during fast sync avoid syncing overhead
+			s.topomapping.Sync() // looks like this is the cause of corruption
+		}
+	}
+	s.last_state_version = state_version
 
 	return err
+}
+func (s *storetopofs) Sync() {
+	s.topomapping.Sync()
 }
 
 func (s *storetopofs) Clean(index int64) (err error) {
@@ -164,6 +174,10 @@ func (s *storetopofs) LocatePruneTopo() int64 {
 	}
 
 	prune_topo--
+
+	if prune_topo > count {
+		panic("invalid prune detected")
+	}
 
 	pruned_till = prune_topo
 	return prune_topo
@@ -280,6 +294,10 @@ func (chain *Blockchain) Find_Blocks_Height_Range(startheight, stopheight int64)
 		stopheight = chain.Get_Height()
 	}
 	_, topos_end := chain.Store.Topo_store.binarySearchHeight(stopheight)
+
+	if topos_start == nil || topos_end == nil {
+		return
+	}
 
 	lowest := topos_start[0]
 	for _, t := range topos_start {

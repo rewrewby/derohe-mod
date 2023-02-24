@@ -24,12 +24,21 @@ import (
 	"time"
 
 	"github.com/deroproject/derohe/block"
+
+	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/cryptography/crypto"
 	"github.com/deroproject/derohe/errormsg"
 	"github.com/deroproject/derohe/globals"
 	"github.com/deroproject/derohe/metrics"
 	"github.com/deroproject/derohe/transaction"
 )
+
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
+var last_height uint64 = 0
 
 // handles notifications of inventory
 func (c *Connection) NotifyINV(request ObjectList, response *Dummy) (err error) {
@@ -99,8 +108,9 @@ func (c *Connection) NotifyINV(request ObjectList, response *Dummy) (err error) 
 		defer cancel()
 
 		if err = c.Client.CallWithContext(ctx, "Peer.GetObject", need, &oresponse); err != nil {
+			c.logger = logger.WithName(c.Addr.String())
 			c.logger.V(2).Error(err, "Call failed GetObject", "need_objects", need)
-			c.exit()
+			c.exit("Call failed GetObject")
 			return
 		} else { // process the response
 			if err = c.process_object_response(oresponse, request.Sent, false); err != nil {
@@ -119,29 +129,41 @@ func (c *Connection) NotifyINV(request ObjectList, response *Dummy) (err error) 
 // only miniblocks carry extra info, which leads to better time tracking
 func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err error) {
 	defer handle_connection_panic(c)
+
+	// for saving time we got the block
+	request_time := globals.Time().UTC().UnixMicro()
+
 	if len(request.MiniBlocks) >= 5 {
 		err = fmt.Errorf("Notify Block can notify max 5 miniblocks")
 		c.logger.V(3).Error(err, "Should be banned")
-		c.exit()
+		c.exit("Should be banned")
 		return err
 	}
 	fill_common_T1(&request.Common)
 	c.update(&request.Common) // update common information
 
+	if c.ActiveTrace {
+		c.logger.Info("Incoming NotifyMiniBlock Request", "request", request)
+	}
+
 	var mbls []block.MiniBlock
 
+	height := uint64(chain.Get_Height())
 	for i := range request.MiniBlocks {
 		var mbl block.MiniBlock
 		if err = mbl.Deserialize(request.MiniBlocks[i]); err != nil {
 			return err
 		}
-		mbls = append(mbls, mbl)
+
+		// MiniBlock Spam Prevention
+		if mbl.Height >= height-1 {
+			mbls = append(mbls, mbl)
+		} else {
+			return fmt.Errorf("Stale Miniblock")
+		}
 
 		atomic.AddUint64(&c.BytesIn, 1)
-		go LogMiniblock(mbl, c.Addr.String())
 	}
-
-	var valid_found bool
 
 	for _, mbl := range mbls {
 		var ok bool
@@ -155,6 +177,8 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 			time_to_receive := float64(globals.Time().UTC().UnixMicro()-request.Sent) / 1000000
 			metrics.Set.GetOrCreateHistogram("miniblock_propagation_duration_histogram_seconds").Update(time_to_receive)
 		}
+
+		go LogMiniblock(mbl, c.Addr.String(), request_time)
 
 		// first check whether it is already in the chain
 		if chain.MiniBlocks.IsCollision(mbl) {
@@ -195,19 +219,54 @@ func (c *Connection) NotifyMiniBlock(request Objects, response *Dummy) (err erro
 		}
 
 		if err, ok = chain.InsertMiniBlock(mbl); !ok {
+			if c.ActiveTrace {
+				c.logger.Info("Bad MiniBlock in NotifyMiniBlock Request", "err", err.Error())
+			}
 			go PeerLogReceiveFail(c.Addr.String(), "InsertMiniBlock", c.Peer_ID, err.Error())
 			// this happens all the time?
 			go LogReject(c.Addr.String())
 			return err
 		} else { // rebroadcast miniblock
-			valid_found = true
-			go LogAccept(c.Addr.String())
-			if valid_found {
-				broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
+
+			chain.MiniBlocks.RLock()
+			globals.MiniBlocksCollectionCount = uint8(len(chain.MiniBlocks.Collection[mbl.GetKey()]))
+			chain.MiniBlocks.RUnlock()
+
+			atomic.AddInt64(&globals.CountTotalBlocks, 1)
+			wallet := GetMinerAddressFromKeyHash(chain, mbl)
+
+			go CheckIfMiniBlockIsOrphaned(false, mbl, wallet)
+
+			if config.RunningConfig.TraceBlocks {
+
+				text_color := green
+				if globals.MiniBlocksCollectionCount > 9 {
+					text_color = yellow
+				}
+
+				wallet_color := blue
+
+				// check if wallet is local and make green
+				globals.Console_Only_Logger.Info(fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+" - "+wallet_color+"%s"+reset_color+": "+text_color+"Successfully found DERO mini block [%d:9]", mbl.Height, wallet, globals.MiniBlocksCollectionCount))
 			}
+
+			broadcast_MiniBlock(mbl, c.Peer_ID, request.Sent) // do not send back to the original peer
+
+			if c.ActiveTrace {
+				c.logger.Info("Good MiniBlock in NotifyMiniBlock - Broadcasting")
+			}
+
+			globals.ForeignMiniFoundTime_lock.Lock()
+			defer globals.ForeignMiniFoundTime_lock.Unlock()
+			globals.ForeignMiniFoundTime[wallet] = append(globals.ForeignMiniFoundTime[wallet], time.Now().Unix())
+
+			go LogAccept(c.Addr.String())
+
 		}
 	}
-
+	if c.ActiveTrace {
+		c.logger.Info("Incoming NotifyMiniBlock Request", "response", response)
+	}
 	fill_common(&response.Common)                         // fill common info
 	fill_common_T0T1T2(&request.Common, &response.Common) // fill time related information
 	return nil
@@ -223,12 +282,11 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 	err = bl.Deserialize(request.CBlocks[0].Block)
 	if err != nil { // we have a block which could not be deserialized ban peer
 		c.logger.V(3).Error(err, "Block cannot be deserialized.Should be banned")
-		c.exit()
+		c.exit("Block cannot be deserialized.Should be banned")
 		return err
 	}
 
 	blid := bl.GetHash()
-	go LogFinalBlock(bl, c.Addr.String())
 	atomic.AddUint64(&c.BytesIn, 1)
 
 	// object is already is in our chain, we need not relay it
@@ -243,8 +301,8 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 			var tx transaction.Transaction
 			err = tx.Deserialize(request.CBlocks[0].Txs[j])
 			if err != nil { // we have a tx which could not be deserialized ban peer
-				c.logger.V(3).Error(err, "tx cannot be deserialized.Should be banned")
-				c.exit()
+				c.logger.Error(err, "tx cannot be deserialized.Should be banned")
+				c.exit("tx cannot be deserialized.Should be banned")
 				return err
 			}
 			cbl.Txs = append(cbl.Txs, &tx)
@@ -260,7 +318,28 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 	if err, ok := chain.Add_Complete_Block(&cbl); ok { // if block addition was successfil
 		// notify all peers
 		Broadcast_Block(&cbl, c.Peer_ID) // do not send back to the original peer
+
+		go LogFinalBlock(bl, c.Addr.String(), globals.Time().UTC().UnixMicro())
 		go LogAccept(c.Addr.String())
+
+		wallet := GetIntegratorAddressFromKeyHash(chain, bl)
+
+		go CheckIfBlockIsOrphaned(false, bl.MiniBlocks[9], wallet)
+
+		if config.RunningConfig.TraceBlocks {
+
+			text_color := green
+			if last_height == bl.Height {
+				// Display orphans as yellow
+				text_color = yellow
+			}
+			atomic.AddInt64(&globals.CountTotalBlocks, 1)
+
+			last_height = bl.Height
+
+			globals.Console_Only_Logger.Info(fmt.Sprintf(text_color+"Height: %d"+reset_color+" - "+blue+"%s"+reset_color+": "+text_color+"Successfully found DERO integrator block", last_height, wallet))
+
+		}
 
 	} else { // ban the peer for sometime
 		c.logger.Error(err, "Error adding block from peer...")
@@ -268,7 +347,7 @@ func (c *Connection) processChunkedBlock(request Objects, data_shard_count, pari
 		go LogReject(c.Addr.String())
 		if err == errormsg.ErrInvalidPoW {
 			c.logger.Error(err, "This peer should be banned and terminated")
-			c.exit()
+			c.exit("This peer should be banned and terminated")
 			return err
 		}
 	}

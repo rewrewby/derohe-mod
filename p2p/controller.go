@@ -56,7 +56,8 @@ var P2P_Port int // this will be exported while doing handshake
 var Exit_Event = make(chan bool) // causes all threads to exit
 var Exit_In_Progress bool        // marks we are doing exit
 var logger logr.Logger           // global logger, every logger in this package is a child of this
-var sync_node bool               // whether sync mode is activated
+
+var sync_node bool // whether sync mode is activated
 
 var nonbanlist []string // any ips in this list will never be banned
 // the list will include seed nodes, any nodes provided at command prompt
@@ -82,9 +83,7 @@ func shouldwebackoff(ip string) bool {
 		}
 	}
 
-	_, backoff_ip := backoff[ip]
-
-	if backoff_ip { // now lets do the test
+	if backoff[ip] != 0 { // now lets do the test
 		return true
 	}
 	return false
@@ -101,15 +100,13 @@ func P2P_Init(params map[string]interface{}) error {
 	// parse node tag if availble
 	if _, ok := globals.Arguments["--node-tag"]; ok {
 		if globals.Arguments["--node-tag"] != nil {
-			SetNodeTag(globals.Arguments["--node-tag"].(string))
+			node_tag = globals.Arguments["--node-tag"].(string)
 		}
 	}
 	if os.Getenv("TURBO") == "0" {
 		logger.Info("P2P is in normal mode")
-		config.RunningConfig.P2PTurbo = false
 	} else {
 		logger.Info("P2P is in turbo mode")
-		config.RunningConfig.P2PTurbo = true
 	}
 
 	if os.Getenv("BW_FACTOR") != "" {
@@ -117,9 +114,7 @@ func P2P_Init(params map[string]interface{}) error {
 		if bw_factor <= 0 {
 			bw_factor = 1
 		}
-
 		logger.Info("", "BW_FACTOR", bw_factor)
-		config.RunningConfig.P2PBWFactor = int64(bw_factor)
 	}
 
 	if os.Getenv("UDP_READ_BUF_CONN") != "" {
@@ -142,10 +137,10 @@ func P2P_Init(params map[string]interface{}) error {
 	}
 
 	chain = params["chain"].(*blockchain.Blockchain)
-	load_ban_list() // load ban list
-	load_permban_list()
-	load_peer_list()  // load old list if availble
-	load_trust_list() // load trusted peers from file
+	load_ban_list()  // load ban list
+	load_peer_list() // load old list if availble
+	// load trusted peers
+	LoadTrustedList()
 
 	// if user provided a sync node, connect with it
 	if _, ok := globals.Arguments["--sync-node"]; ok { // check if parameter is supported
@@ -170,10 +165,6 @@ func P2P_Init(params map[string]interface{}) error {
 	globals.Cron.AddFunc("@every 5s", Connection_Pending_Clear) // clean dead connections
 	globals.Cron.AddFunc("@every 10s", ping_loop)               // ping every one
 	globals.Cron.AddFunc("@every 10s", chunks_clean_up)         // clean chunks
-	globals.Cron.AddFunc("@every 60s", save_peer_list)          // save peer list so we can use it for monitoring
-	globals.Cron.AddFunc("@every 60s", save_ban_list)           // save peer list so we can use it for monitoring
-	globals.Cron.AddFunc("@every 60s", save_permban_list)       // save permban list
-	globals.Cron.AddFunc("@every 60s", ClearPeerLogsCron)       // cleanup running peer logs
 
 	go time_check_routine() // check whether server time is in sync using ntp
 
@@ -249,6 +240,12 @@ func P2P_engine() {
 		}
 	}
 
+	if _, ok := globals.Arguments["--add-exclusive-node"]; ok && len(globals.Arguments["--add-exclusive-node"].([]string)) == 0 { // check if parameter is supported
+
+		for trusted, _ := range GetTrustedMap() {
+			end_point_list = append(end_point_list, trusted)
+		}
+	}
 	//logger.Debugf("Priority list %+v", end_point_list)
 
 	// maintain connection to exclusive/priority nodes
@@ -271,11 +268,11 @@ func P2P_engine() {
 			// trigger connection to all seed nodes hoping some will be up
 			if globals.IsMainnet() { // initial boot strap should be quick
 				for i := range config.Mainnet_seed_nodes {
-					go connect_with_endpoint(config.Mainnet_seed_nodes[i], true)
+					go connect_with_endpoint(config.Mainnet_seed_nodes[i], sync_node)
 				}
 			} else { // initial bootstrap
 				for i := range config.Testnet_seed_nodes {
-					go connect_with_endpoint(config.Testnet_seed_nodes[i], true)
+					go connect_with_endpoint(config.Testnet_seed_nodes[i], sync_node)
 				}
 			}
 
@@ -287,7 +284,7 @@ func P2P_engine() {
 
 func tunekcp(conn *kcp.UDPSession) {
 	conn.SetACKNoDelay(true)
-	if config.RunningConfig.P2PTurbo {
+	if os.Getenv("TURBO") == "0" {
 		conn.SetNoDelay(1, 10, 2, 1) // tuning paramters for local stack for fast retransmission stack
 	} else {
 		conn.SetNoDelay(0, 40, 0, 0) // tuning paramters for local
@@ -320,24 +317,26 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 		return
 	}
 
-	if IsAddressInBanList(ParseIPNoError(remote_ip.IP.String())) {
+	ip := ParseIPNoError(remote_ip.String())
+
+	if shouldwebackoff(endpoint) {
+		logger.V(4).Info("backing off from this connection", "ip", remote_ip.String())
+		return
+	} else {
+		backoff_mutex.Lock()
+		backoff[endpoint] = time.Now().Unix() + 10
+		backoff_mutex.Unlock()
+	}
+
+	if IsAddressInBanList(ip) {
 		logger.V(2).Info("Connecting to banned IP is prohibited", "IP", remote_ip.IP.String())
 		return
 	}
 
 	// check whether are already connected to this address if yes, return
-	if IsAddressConnected(ParseIPNoError(remote_ip.String())) {
+	if IsAddressConnected(ip) {
 		logger.V(4).Info("outgoing address is already connected", "ip", remote_ip.String())
 		return //nil, fmt.Errorf("Already connected")
-	}
-
-	if shouldwebackoff(ParseIPNoError(remote_ip.String())) {
-		logger.V(1).Info("backing off from this connection", "ip", remote_ip.String())
-		return
-	} else {
-		backoff_mutex.Lock()
-		backoff[ParseIPNoError(remote_ip.String())] = time.Now().Unix() + 10
-		backoff_mutex.Unlock()
 	}
 
 	var masterkey = pbkdf2.Key(globals.Config.Network_ID.Bytes(), globals.Config.Network_ID.Bytes(), 1024, 32, sha1.New)
@@ -395,7 +394,7 @@ func connect_with_endpoint(endpoint string, sync_node bool) {
 
 	if err != nil {
 		logger.V(3).Error(err, "Dial failed", "endpoint", endpoint)
-		Peer_SetFail(ParseIPNoError(remote_ip.String())) // update peer list as we see
+		Peer_SetFail(ip) // update peer list as we see
 		conn.Close()
 		return //nil, fmt.Errorf("Dial failed err %s", err.Error())
 	}
@@ -442,8 +441,8 @@ func maintain_seed_node_connection() {
 			endpoint = config.Testnet_seed_nodes[r.Int64()%int64(len(config.Testnet_seed_nodes))]
 		}
 		if endpoint != "" {
-			//connect_with_endpoint(endpoint, sync_node)
-			connect_with_endpoint(endpoint, true) // seed nodes always have sync mode
+			connect_with_endpoint(endpoint, sync_node)
+			//connect_with_endpoint(endpoint, true) // seed nodes always have sync mode
 		}
 	}
 }
@@ -461,7 +460,6 @@ func maintain_connection_to_peers() {
 				logger.Error(fmt.Errorf("--min-peers should be positive and more than 1"), "")
 			} else {
 				Min_Peers = i
-				config.RunningConfig.Min_Peers = Min_Peers
 			}
 		}
 		logger.Info("Min peers", "min-peers", Min_Peers)
@@ -476,15 +474,9 @@ func maintain_connection_to_peers() {
 				logger.Error(fmt.Errorf("--max-peers should be positive and more than --min-peers"), "")
 			} else {
 				Max_Peers = i
-				config.RunningConfig.Max_Peers = Max_Peers
 			}
 		}
 		logger.Info("Max peers", "max-peers", Max_Peers)
-	}
-
-	// check max and min peers are alligned
-	if Min_Peers > Max_Peers {
-		Max_Peers = Min_Peers
 	}
 
 	delay := time.NewTicker(200 * time.Millisecond)
@@ -498,21 +490,23 @@ func maintain_connection_to_peers() {
 
 		// check number of connections, if limit is reached, trigger new connections if we have peers
 		// if we have more do nothing
-		in, out := Peer_Direction_Count()
-		if out+in >= uint64(Max_Peers) { // we already have required number of peers, donot connect to more peers
+		_, out := Peer_Direction_Count()
+		if out >= uint64(Min_Peers) { // we already have required number of peers, donot connect to more peers
 			continue
 		}
 
 		peer := find_peer_to_connect(1)
 		if peer != nil && !IsAddressConnected(ParseIPNoError(peer.Address)) {
+
 			go connect_with_endpoint(peer.Address, false)
+
 		}
 	}
 }
 
 func P2P_Server_v2() {
 
-	var accept_limiter = rate.NewLimiter(100.0, 40) // 10 incoming per sec, burst of 40 is okay
+	var accept_limiter = rate.NewLimiter(10.0, 40) // 10 incoming per sec, burst of 40 is okay
 
 	default_address := "0.0.0.0:0" // be default choose a random port
 	if _, ok := globals.Arguments["--p2p-bind"]; ok && globals.Arguments["--p2p-bind"] != nil {
@@ -541,13 +535,19 @@ func P2P_Server_v2() {
 		tlsconn_interface, _ := c.State.Get("tlsconn")
 		tlsconn := tlsconn_interface.(net.Conn)
 
-		connection := &Connection{Client: c, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: true}
-		connection.logger = logger.WithName("incoming").WithName(remote_addr.String())
+		connection := &Connection{Client: c, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: true, Trusted: IsTrustedIP(remote_addr.String()), ActiveTrace: IsPeerTraced(remote_addr.String())}
+		new_logger := logger.WithName("INC").WithName(remote_addr.String())
+
+		connection.logger = new_logger
+
+		if connection.ActiveTrace {
+			connection.logger.Info("Incoming Connection")
+		}
 
 		in, out := Peer_Direction_Count()
 
 		if int64(in+out) > Max_Peers { // do not allow incoming ddos
-			connection.exit()
+			connection.exit("Already at maximum peers")
 			return
 		}
 
@@ -556,8 +556,9 @@ func P2P_Server_v2() {
 		//connection.logger.Info("connected  OnConnect")
 		go func() {
 			time.Sleep(2 * time.Second)
+			new_logger := logger.WithName(remote_addr.String())
+			connection.logger = new_logger
 			connection.dispatch_test_handshake()
-
 		}()
 
 	})
@@ -607,7 +608,7 @@ func P2P_Server_v2() {
 		raddr := conn.RemoteAddr().(*net.UDPAddr)
 
 		backoff_mutex.Lock()
-		backoff[ParseIPNoError(raddr.String())] = time.Now().Unix() + 10
+		backoff[raddr.String()] = time.Now().Unix() + globals.Global_Random.Int63n(200) // random backing of upto 200 secs
 		backoff_mutex.Unlock()
 
 		logger.V(3).Info("accepting incoming connection", "raddr", raddr.String())
@@ -615,12 +616,10 @@ func P2P_Server_v2() {
 		if IsAddressConnected(ParseIPNoError(raddr.String())) {
 			logger.V(4).Info("incoming address is already connected", "ip", raddr.String())
 			conn.Close()
-			continue
 
 		} else if IsAddressInBanList(ParseIPNoError(raddr.IP.String())) { //if incoming IP is banned, disconnect now
 			logger.V(2).Info("Incoming IP is banned, disconnecting now", "IP", raddr.IP.String())
 			conn.Close()
-			continue
 		}
 
 		tunekcp(conn) // tuning paramters for local stack
@@ -640,7 +639,7 @@ func handle_connection_panic(c *Connection) {
 	defer globals.Recover(2)
 	if r := recover(); r != nil {
 		logger.V(2).Error(nil, "Recovered while handling connection", "r", r, "stack", string(debug.Stack()))
-		c.exit()
+		c.exit("Connection panic")
 	}
 }
 
@@ -701,9 +700,10 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 
 	client := rpc2.NewClientWithCodec(NewCBORCodec(tlsconn))
 
-	c := &Connection{Client: client, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: incoming, SyncNode: sync_node}
-	defer c.exit()
-	c.logger = logger.WithName("outgoing").WithName(remote_addr.String())
+	c := &Connection{Client: client, Conn: conn, ConnTls: tlsconn, Addr: remote_addr, State: HANDSHAKE_PENDING, Incoming: incoming, SyncNode: sync_node, Trusted: IsTrustedIP(remote_addr.String()), ActiveTrace: IsPeerTraced(remote_addr.String())}
+	defer c.exit("Process Outgoing Connection")
+	new_logger := logger.WithName("OUT").WithName(remote_addr.String())
+	c.logger = new_logger
 	set_handlers(client)
 
 	client.State = rpc2.NewState()
@@ -711,6 +711,8 @@ func process_outgoing_connection(conn net.Conn, tlsconn net.Conn, remote_addr ne
 
 	go func() {
 		time.Sleep(2 * time.Second)
+		new_logger := logger.WithName(remote_addr.String())
+		c.logger = new_logger
 		c.dispatch_test_handshake()
 	}()
 

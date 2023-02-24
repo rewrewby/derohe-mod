@@ -56,7 +56,7 @@ func (handshake *Handshake_Struct) Fill() {
 	handshake.Local_Port = uint32(P2P_Port)             // export requested or default port
 	handshake.Peer_ID = GetPeerID()                     // give our randomly generated peer id
 	handshake.Pruned = chain.LocatePruneTopo()
-
+	handshake.Hansen33Mod = true
 	//	handshake.Flags = // add any flags necessary
 
 	copy(handshake.Network_ID[:], globals.Config.Network_ID[:])
@@ -66,29 +66,70 @@ func (handshake *Handshake_Struct) Fill() {
 // all clients start with handshake, then other party sends avtive to mark that connection is active
 func (connection *Connection) dispatch_test_handshake() {
 	defer handle_connection_panic(connection)
+
 	var request, response Handshake_Struct
 	request.Fill()
 
 	//scan our peer list and send peers which have been recently communicated
 	request.PeerList = get_peer_list_specific(Address(connection))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	if connection.ActiveTrace {
+		connection.logger.Info("Outgoing Handshake Request", "request", request)
+	}
+
+	timeout := 10
+	if IsTrustedIP(connection.Addr.String()) {
+		timeout = 30
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
+
 	if err := connection.Client.CallWithContext(ctx, "Peer.Handshake", request, &response); err != nil {
-		connection.logger.V(4).Error(err, "cannot handshake")
-		connection.exit()
+
+		err = fmt.Errorf("%s", err.Error())
+
+		if connection.ActiveTrace {
+			connection.logger.Error(err, "Outgoing Handshake Failed")
+		}
+		// connection.logger.V(3).Error(err, "cannot handshake", "error", err.Error())
+		connection.exit("Outgoing Handshake Failed")
 		return
 	}
 
 	if !Verify_Handshake(&response) { // if not same network boot off
+		if connection.ActiveTrace {
+			connection.logger.Info("Outgoing Verify Handshake Failed")
+
+		}
 		connection.logger.V(3).Info("terminating connection network id mismatch ", "networkid", response.Network_ID)
-		connection.exit()
+		connection.exit("terminating connection network id mismatch")
 		return
 	}
-	connection.update(&response.Common) // update common information
-	if !Connection_Add(connection) {    // add connection to pool
-		connection.exit()
+	if !Connection_Add(connection) { // add connection to pool
+		if connection.ActiveTrace {
+			connection.logger.Info("Outgoing Handshake - Not able to add connection")
+		}
+		connection.exit("Can't add connection")
 		return
+	}
+	if connection.ActiveTrace {
+		connection.logger.Info("Outgoing Handshake Request", "response", response)
+	}
+
+	connection.update(&response.Common) // update common information
+
+	if config.RunningConfig.TraceNewConnections {
+		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", chain.Get_Height())
+		direction := "Incoming"
+		if !connection.Incoming {
+			direction = "Outgoing"
+		}
+
+		connection_string := fmt.Sprintf(red+"[ "+blue+"%s Connection "+red+"]", direction)
+
+		host_string := fmt.Sprintf("%s", connection.Addr.String())
+		tag_string := fmt.Sprintf("%s ", response.Tag)
+		globals.Console_Only_Logger.Info(fmt.Sprintf("%-33s %-42s "+yellow+"%-24s "+green+"%-22s"+reset_color, height_txt, connection_string, host_string, tag_string))
 	}
 
 	if len(response.ProtocolVersion) < 128 {
@@ -124,11 +165,20 @@ func (connection *Connection) dispatch_test_handshake() {
 		Peer_Add(&p)
 	}
 
-	// parse delivered peer list as grey list
-	connection.logger.V(4).Info("Peer provides peers", "count", len(response.PeerList))
+	if len(response.PeerList) >= 1 {
+		if connection.Trusted {
+			connection.logger.V(2).Info("Trusted Peer provides peers in dispatch_test_handshake", "count", len(response.PeerList))
+			connection.logger.V(3).Info("Trusted Peer provides peers in dispatch_test_handshake", "peers", response.PeerList)
+		} else {
+			connection.logger.V(2).Info("Peer provides peers in dispatch_test_handshake", "count", len(response.PeerList))
+			connection.logger.V(3).Info("Peer provides peers in dispatch_test_handshake", "peers", response.PeerList)
+		}
+	}
+
+	// connection.logger.V(4).Info("Peer provides peers", "count", len(response.PeerList))
 	for i := range response.PeerList {
 		if i < 13 {
-			go Peer_Add(&Peer{Address: response.PeerList[i].Addr, LastConnected: uint64(time.Now().UTC().Unix())})
+			Peer_Add(&Peer{Address: response.PeerList[i].Addr, LastConnected: uint64(time.Now().UTC().Unix())})
 		}
 	}
 
@@ -138,10 +188,17 @@ func (connection *Connection) dispatch_test_handshake() {
 // used to ping pong
 func (c *Connection) Ping(request Dummy, response *Dummy) error {
 	defer handle_connection_panic(c)
+
 	fill_common_T1(&request.Common)
 	c.update(&request.Common)                             // update common information
 	fill_common(&response.Common)                         // fill common info
 	fill_common_T0T1T2(&request.Common, &response.Common) // fill time related information
+
+	if c.ActiveTrace {
+		c.logger.Info("Incoming Ping Request", "request", request)
+		c.logger.Info("Incoming Ping Request", "response", response)
+	}
+
 	return nil
 }
 
@@ -150,27 +207,42 @@ func (c *Connection) Handshake(request Handshake_Struct, response *Handshake_Str
 	defer handle_connection_panic(c)
 	if request.Peer_ID == GetPeerID() { // check if self connection exit
 		//rlog.Tracef(1, "Same peer ID, probably self connection, disconnecting from this client")
-		c.exit()
+		c.exit("Same peer ID")
 		return fmt.Errorf("Same peer ID")
 	}
 
 	if !Verify_Handshake(&request) { // if not same network boot off
 		logger.V(2).Info("kill connection network id mismatch peer network id.", "Network_ID", request.Network_ID)
-		c.exit()
+		c.exit("NID mismatch")
 		return fmt.Errorf("NID mismatch")
+	}
+
+	if c.ActiveTrace {
+		c.logger.Info("Incoming Handshake Request", "request", request)
 	}
 
 	response.Fill()
 
+	if c.ActiveTrace {
+		c.logger.Info("Incoming Handshake Request", "response", response)
+	}
+
 	c.update(&request.Common) // update common information
 	if c.State == ACTIVE {
+		if c.Trusted {
+			c.logger.V(2).Info("Peer provides peers in handshake", "count", len(request.PeerList))
+			c.logger.V(3).Info("Peer provides peers in handshake", "peers", request.PeerList)
+		} else {
+			c.logger.V(2).Info("Trusted Peer provides peers in handshake", "count", len(request.PeerList))
+			c.logger.V(3).Info("Trusted Peer provides peers in handshake", "peers", request.PeerList)
+		}
 		for i := range request.PeerList {
 			if i < 31 {
-				go Peer_Add(&Peer{Address: request.PeerList[i].Addr, LastConnected: uint64(time.Now().UTC().Unix())})
+				Peer_Add(&Peer{Address: request.PeerList[i].Addr, LastConnected: uint64(time.Now().UTC().Unix())})
 			}
 		}
 	}
-	if config.RunningConfig.WhitelistIncoming || !c.Incoming {
+	if !c.Incoming {
 		Peer_SetSuccess(c.Addr.String())
 	}
 

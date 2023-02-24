@@ -23,7 +23,7 @@ func (c *Connection) TreeSection(request Request_Tree_Section_Struct, response *
 	defer handle_connection_panic(c)
 	if request.Topo < 2 || request.SectionLength > 256 || len(request.Section) < int(request.SectionLength/8) { // we are expecting 1 block or 1 tx
 		c.logger.V(1).Info("malformed object request  received, banning peer", "request", request)
-		c.exit()
+		c.exit("malformed object request")
 	}
 
 	c.update(&request.Common) // update common information
@@ -39,6 +39,7 @@ func (c *Connection) TreeSection(request Request_Tree_Section_Struct, response *
 		if topo_ss, err = chain.Store.Balance_store.LoadSnapshot(topo_sr.State_Version); err == nil {
 			if topo_balance_tree, err = topo_ss.GetTree(string(request.TreeName)); err == nil {
 				cursor := topo_balance_tree.Cursor()
+				response.KeyCount = topo_balance_tree.KeyCountEstimate()
 				for k, v, err := cursor.SpecialFirst(request.Section, uint(request.SectionLength)); err == nil; k, v, err = cursor.Next() {
 					response.Keys = append(response.Keys, k)
 					response.Values = append(response.Values, v)

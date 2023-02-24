@@ -21,8 +21,10 @@ package p2p
 
 //import "container/list"
 
-import "github.com/deroproject/derohe/cryptography/crypto"
-import "github.com/deroproject/derohe/globals"
+import (
+	"github.com/deroproject/derohe/cryptography/crypto"
+	"github.com/deroproject/derohe/globals"
+)
 
 //import "github.com/deroproject/derosuite/blockchain"
 
@@ -32,19 +34,19 @@ func (c *Connection) Chain(request Chain_Request_Struct, response *Chain_Respons
 	defer handle_connection_panic(c)
 	if len(request.Block_list) < 1 { // malformed request ban peer
 		c.logger.V(3).Info("malformed chain request  received, banning peer", "request", request)
-		c.exit()
+		c.exit("malformed chain request")
 		return nil
 	}
 
 	if len(request.Block_list) != len(request.TopoHeights) || len(request.Block_list) > 1024 {
 		c.logger.V(3).Info("Peer chain is invalid", "blocks", len(request.Block_list), "topos", len(request.TopoHeights))
-		c.exit()
+		c.exit("Peer chain is invalid")
 		return nil
 	}
 
 	if request.Block_list[len(request.Block_list)-1] != globals.Config.Genesis_Block_Hash {
 		c.logger.V(3).Info("Peer chain is invalid", "blocks", len(request.Block_list), "topos", len(request.TopoHeights))
-		c.exit()
+		c.exit("Peer chain is invalid")
 		return nil
 	}
 

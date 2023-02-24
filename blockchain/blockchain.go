@@ -36,6 +36,7 @@ import (
 	"github.com/go-logr/logr"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/sync/semaphore"
+	"golang.org/x/time/rate"
 
 	"github.com/deroproject/derohe/block"
 	"github.com/deroproject/derohe/blockchain/mempool"
@@ -51,6 +52,13 @@ import (
 	"github.com/deroproject/graviton"
 	lru "github.com/hashicorp/golang-lru"
 )
+
+// adding some colors
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
 
 // all components requiring access to blockchain must use , this struct to communicate
 // this structure must be update while mutex
@@ -107,8 +115,11 @@ var logger logr.Logger = logr.Discard() // default discard all logs
    Global parameters are picked up  from the config package
 */
 
-func SetLogger(newlogger *logr.Logger) {
-	logger = *newlogger
+func SetBlockchainLogger(newlogger *logr.Logger) {
+
+	mylogger := *newlogger
+	logger = mylogger.WithName("CORE")
+
 }
 
 func Blockchain_Start(params map[string]interface{}) (*Blockchain, error) {
@@ -885,9 +896,9 @@ func (chain *Blockchain) Add_Complete_Block(cbl *block.Complete_Block) (err erro
 	if height > chain.Get_Height() || height == 0 { // exception for genesis block
 		//atomic.StoreInt64(&chain.Height, height)
 		height_changed = true
-		block_logger.Info("Chain extended", "new height", height)
+		block_logger.V(1).Info("Chain extended", "new height", height)
 	} else {
-		block_logger.Info("Chain extended but height is same", "new height", height)
+		block_logger.V(1).Info("Chain extended but height is same", "new height", height)
 		chain_extended_lock.Lock()
 		SameHeightChainExtended[height]++
 		chain_extended_lock.Unlock()
@@ -1132,11 +1143,8 @@ func (chain *Blockchain) Add_Complete_Block(cbl *block.Complete_Block) (err erro
 		block_logger.Info(fmt.Sprintf("Chain Height %d", chain.Get_Height()))
 	}
 
-	hash, err := chain.Load_Block_Topological_order_at_index(int64(chain.Get_Stable_Height()))
-	oldBlock, err := chain.Load_BL_FROM_ID(hash)
-
 	if chain.Get_Height() > 0 {
-		purge_count := chain.MiniBlocks.PurgeHeight(oldBlock.MiniBlocks, chain.Get_Stable_Height()) // purge all miniblocks upto this height
+		purge_count := chain.MiniBlocks.PurgeHeight(chain.Get_Stable_Height()) // purge all miniblocks upto this height
 		logger.V(2).Info("Purged miniblock", "count", purge_count)
 
 	}
@@ -1209,12 +1217,20 @@ func (chain *Blockchain) BlockCheckSum(cbl *block.Complete_Block) []byte {
 // add a transaction to MEMPOOL,
 // verifying everything  means everything possible
 // this only change mempool, no DB changes
+
+var regpool_accept_limit = rate.NewLimiter(5.0, 10) // 5 incoming per sec, burst of 10 is okay
+
 func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 	var err error
+
+	if !regpool_accept_limit.Allow() { // rate limiter
+		return fmt.Errorf("reg tx limit")
+	}
 
 	if tx.IsPremine() {
 		return fmt.Errorf("premine tx not mineable")
 	}
+
 	if tx.IsRegistration() { // registration tx will not go any forward
 
 		tx_hash := tx.GetHash()
@@ -1324,12 +1340,62 @@ func (chain *Blockchain) Add_TX_To_Pool(tx *transaction.Transaction) error {
 
 	if chain.Mempool.Mempool_Add_TX(tx, 0) { // new tx come with 0 marker
 		//rlog.Tracef(2, "Successfully added tx %s to pool", txhash)
+		go LogTx(tx, chain.Get_Height())
 		return nil
 	} else {
 		//rlog.Tracef(2, "TX %s rejected by pool by mempool", txhash)
 		return fmt.Errorf("TX %s rejected by pool by mempool", txhash)
 	}
 
+}
+
+func LogTx(tx *transaction.Transaction, height int64) {
+	if config.RunningConfig.TraceTx {
+
+		height_txt := fmt.Sprintf(green+"Height: "+yellow+"%d"+reset_color+"", height)
+		txt_text := fmt.Sprintf(blue+"TXID"+reset_color+": "+blue+"%s"+reset_color+"", tx.GetHash())
+		type_text := red + "** UN-IDENTIFIED TX **"
+
+		// fees_deri := tx.Fees()
+		bytes := len(tx.Serialize())
+		kiloBytes := float64(float64(bytes) / 1024)
+
+		size := fmt.Sprintf(blue+"Size "+yellow+"%.3f"+blue+" kB", kiloBytes)
+
+		// registration tx are represented by this
+
+		switch tx.TransactionType {
+
+		case transaction.REGISTRATION:
+
+			type_text = green + "New Registration" + reset_color + ""
+
+		case transaction.BURN_TX:
+
+			type_text = " 🔥 " + red + "BURN" + reset_color + " 🔥 "
+
+		case transaction.NORMAL:
+
+			type_text = blue + "Normal TX" + reset_color + ""
+
+		case transaction.SC_TX:
+
+			type_text = yellow + "Smart Contract TX" + reset_color + ""
+
+		default:
+
+		}
+
+		fees := globals.FormatMoney(tx.Fees())
+		amount := fmt.Sprintf(blue+"Fee "+yellow+"%s"+blue+" DERO", fees)
+
+		ring_size := fmt.Sprintf(blue + "Ringsize " + red + "Unknown" + reset_color)
+		if len(tx.Payloads) >= 1 {
+			ring_size = fmt.Sprintf(blue+"Ringsize "+yellow+"%d"+reset_color, int(tx.Payloads[0].Statement.RingSize))
+		}
+
+		globals.Console_Only_Logger.Info(fmt.Sprintf("%-31s %-30s %-35s %-35s %-30s %-90s"+reset_color, height_txt, type_text, size, amount, ring_size, txt_text))
+	}
 }
 
 // side blocks are blocks which lost the race the to become part
@@ -1435,6 +1501,11 @@ func (chain *Blockchain) Rewind_Chain(rewind_count int) (result bool) {
 		return
 	}
 
+	// a pruned chain can only be rewinded upto it pruned height only
+	if chain.Load_TOPO_HEIGHT()-int64(rewind_count) <= pruned_till {
+		return false
+	}
+
 	top_block_topo_index := chain.Load_TOPO_HEIGHT()
 	rewinded := int64(0)
 
@@ -1458,7 +1529,7 @@ func (chain *Blockchain) Rewind_Chain(rewind_count int) (result bool) {
 		chain.Store.Topo_store.Clean(top_block_topo_index - i)
 	}
 
-	chain.MiniBlocks.PurgeHeight(nil, 0xffffffffffffff) // purge all miniblocks upto this height
+	chain.MiniBlocks.PurgeHeight(0xffffffffffffff) // purge all miniblocks upto this height
 
 	return true
 }

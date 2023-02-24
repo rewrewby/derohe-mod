@@ -33,7 +33,6 @@ import (
 
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/globals"
-	"github.com/go-logr/logr"
 )
 
 //import "encoding/binary"
@@ -67,6 +66,8 @@ type Peer struct {
 	Whitelist       bool   `json:"whitelist"`
 	sync.Mutex
 }
+
+var AllSeenPeers = make(map[string]int64)
 
 var peer_map = map[string]*Peer{}
 var peer_mutex sync.Mutex
@@ -111,7 +112,7 @@ func Peer_Count_Whitelist() (Count uint64) {
 	return
 }
 
-//save peer list to disk
+// save peer list to disk
 func save_peer_list() {
 
 	clean_up()
@@ -144,16 +145,17 @@ func clean_up() {
 			v.FailCount = 0
 			continue
 		}
+
 		if v.FailCount >= 8 { // roughly 8 tries before we discard the peer
 			delete(peer_map, k)
 		}
-		if v.LastConnected == 0 { // if never connected, purge the peer
-			delete(peer_map, k)
-		}
+		// if v.LastConnected == 0 { // if never connected, purge the peer
+		// 	delete(peer_map, k)
+		// }
 
-		if uint64(time.Now().UTC().Unix()) > (v.LastConnected + 3600) { // purge all peers which were not connected in
-			delete(peer_map, k)
-		}
+		// if uint64(time.Now().UTC().Unix()) > (v.LastConnected + 3600) { // purge all peers which were not connected in
+		// 	delete(peer_map, k)
+		// }
 	}
 }
 
@@ -177,6 +179,73 @@ func GetPeerInList(address string) *Peer {
 	return nil
 }
 
+var PeerTraceList []string
+var trace_lock sync.Mutex
+
+func ClearTraceList() {
+
+	var NewList []string
+
+	trace_lock.Lock()
+	defer trace_lock.Unlock()
+	PeerTraceList = NewList
+
+	for _, conn := range UniqueConnections() {
+		conn.ActiveTrace = false
+	}
+
+}
+
+func AddPeerTraceList(Address string) {
+
+	Address = ParseIPNoError(Address)
+
+	if IsPeerTraced(Address) {
+		return
+	}
+
+	logger.Info(fmt.Sprintf("PEER: %s - Added to Trace List", Address))
+	trace_lock.Lock()
+	defer trace_lock.Unlock()
+	PeerTraceList = append(PeerTraceList, Address)
+
+	for _, conn := range UniqueConnections() {
+		if ParseIPNoError(conn.Addr.String()) == Address {
+			conn.ActiveTrace = true
+		}
+	}
+}
+
+func IsPeerTraced(ip string) bool {
+	trace_lock.Lock()
+	defer trace_lock.Unlock()
+
+	found := false
+	for _, peer := range PeerTraceList {
+		if peer == ParseIPNoError(ip) {
+			found = true
+		}
+	}
+
+	return found
+}
+
+func CountAllSeenPeer() int {
+
+	peer_mutex.Lock()
+	defer peer_mutex.Unlock()
+
+	chain_hight := chain.Get_Height()
+
+	for peer, height := range AllSeenPeers {
+		if height < chain_hight-config.RunningConfig.NetworkStatsKeepCount {
+			delete(AllSeenPeers, peer)
+		}
+	}
+
+	return len(AllSeenPeers)
+}
+
 // add connection to  map
 func Peer_Add(p *Peer) {
 	clean_up()
@@ -188,6 +257,8 @@ func Peer_Add(p *Peer) {
 		return
 
 	}
+
+	AllSeenPeers[ParseIPNoError(p.Address)] = chain.Get_Height()
 
 	// trusted only if enabled
 	if config.RunningConfig.OnlyTrusted {
@@ -224,22 +295,6 @@ func Peer_Add(p *Peer) {
 		// logger.Infof("Peer adding to list")
 		peer_map[ParseIPNoError(p.Address)] = p
 	}
-
-}
-
-func SetLogger(newlogger *logr.Logger) {
-
-	peer_mutex.Lock()
-	defer peer_mutex.Unlock()
-
-	connection_map.Range(func(k, value interface{}) bool {
-		c := value.(*Connection)
-
-		logger = *newlogger
-		c.logger = logger.WithName("incoming").WithName(c.Addr.String())
-
-		return true
-	})
 
 }
 

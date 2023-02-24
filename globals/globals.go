@@ -22,6 +22,8 @@ import (
 	"math"
 	"math/big"
 	"net/url"
+	"sort"
+	"sync"
 
 	"os"
 
@@ -32,6 +34,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/deroproject/derohe/config"
 	"github.com/deroproject/derohe/rpc"
 	"github.com/go-logr/logr"
@@ -41,6 +44,13 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/net/proxy"
 )
+
+// Colors
+var green string = "\033[32m"      // default is green color
+var yellow string = "\033[33m"     // make prompt yellow
+var red string = "\033[31m"        // make prompt red
+var blue string = "\033[34m"       // blue color
+var reset_color string = "\033[0m" // reset color
 
 // all the the global variables used by the program are stored here
 // since the entire logic is designed around a state machine driven by external events
@@ -55,7 +65,17 @@ var BlockChainStartHeight int64
 var Config config.CHAIN_CONFIG = config.Mainnet // default is mainnnet
 
 // global logger all components will use it with context
-var Logger logr.Logger = logr.Discard() // default discard all logs
+var Logger logr.Logger = logr.Discard()         // default discard all logs
+var LoggerOriginal logr.Logger = logr.Discard() // default discard all logs
+var OriginalLogLevel int8
+var Console_Only_Logger logr.Logger = logr.Discard() // default discard all logs
+
+func SetGlobalsLogger(newlogger *logr.Logger) {
+
+	mylogger := *newlogger
+	Logger = mylogger
+
+}
 
 var ClockOffset time.Duration    // actual clock offset that is used by the daemon
 var ClockOffsetNTP time.Duration // clockoffset in reference to ntp servers
@@ -76,6 +96,11 @@ var threadProfile = pprof.Lookup("threadcreate")
 var mutexProfile = pprof.Lookup("mutex")
 var blockingProfile = pprof.Lookup("block")
 var goProfile = pprof.Lookup("goroutine")
+
+var MiniBlocksCollectionCount uint8
+
+var NodeMaintenance bool = false
+var MaintenanceStart int64 = time.Now().Unix()
 
 func CountThreads() int {
 	return threadProfile.Count()
@@ -167,39 +192,19 @@ func (c *removeCallerCore) With(fields []zap.Field) zapcore.Core {
 	return &removeCallerCore{c.Core.With(fields)}
 }
 
-func SetLogLevel(console, logfile io.Writer, log_level int) {
+func SetLogLevel(console io.Writer, log_level int8) {
 
-	Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(log_level))
+	if log_level > 127 {
+		log_level = 127
+	}
 
-	zf := zap.NewDevelopmentEncoderConfig()
-	zc := zap.NewDevelopmentEncoderConfig()
-	zc.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	zc.EncodeTime = zapcore.TimeEncoderOfLayout("02/01 15:04:05")
-
-	file_encoder := zapcore.NewJSONEncoder(zf)
-	console_encoder := zapcore.NewConsoleEncoder(zc)
-
-	core_console := zapcore.NewCore(console_encoder, zapcore.AddSync(console), Log_Level_Console)
-	removecore := &removeCallerCore{core_console}
-	core := zapcore.NewTee(
-		removecore,
-		zapcore.NewCore(file_encoder, zapcore.AddSync(logfile), Log_Level_File),
-	)
-
-	zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
-
-	Logger = zapr.NewLogger(zcore) // sets up global logger
-	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
-
-	// remember -1 is debug, 0 is info
-
+	Log_Level_Console.SetLevel(zapcore.Level(0 - log_level))
 }
 
 func InitializeLog(console, logfile io.Writer) {
 
 	if Arguments["--debug"] != nil && Arguments["--debug"].(bool) == true { // setup debug mode if requested
 		Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(-1))
-		config.RunningConfig.LogLevel = 1
 	}
 
 	if Arguments["--clog-level"] != nil { // setup log level if requested
@@ -211,8 +216,8 @@ func InitializeLog(console, logfile io.Writer) {
 		if log_level > 127 {
 			log_level = 127
 		}
-		config.RunningConfig.LogLevel = log_level
 		Log_Level_Console = zap.NewAtomicLevelAt(zapcore.Level(0 - log_level))
+		OriginalLogLevel = log_level
 	}
 
 	if Arguments["--flog-level"] != nil { // setup log level if requested
@@ -242,14 +247,25 @@ func InitializeLog(console, logfile io.Writer) {
 		zapcore.NewCore(file_encoder, zapcore.AddSync(logfile), Log_Level_File),
 	)
 
+	core_console_log := zapcore.NewTee(
+		removecore,
+	)
+
 	zcore := zap.New(core, zap.AddCaller()) // add caller info to every record which is then trimmed from console
 
+	zcore_console := zap.New(core_console_log, zap.AddCaller())
+
 	Logger = zapr.NewLogger(zcore) // sets up global logger
+	LoggerOriginal = Logger
 	//Logger = zapr.NewLoggerWithOptions(zcore,zapr.LogInfoLevel("V")) // if you need verbosity levels
 
+	Console_Only_Logger = zapr.NewLogger(zcore_console)
+
+	// Console_Only_Logger = Logger
 	// remember -1 is debug, 0 is info
 
 }
+
 func Initialize() {
 	var err error
 
@@ -331,7 +347,6 @@ func GetDataDirectory() string {
 
 // never do any division operation on money due to floating point issues
 // newbies, see type the next in python interpretor "3.33-3.13"
-//
 func FormatMoney(amount uint64) string {
 	return FormatMoneyPrecision(amount, 5) // default is 5 precision after floating point
 }
@@ -341,12 +356,12 @@ func FormatMoney0(amount uint64) string {
 	return FormatMoneyPrecision(amount, 0)
 }
 
-//5 precision
+// 5 precision
 func FormatMoney5(amount uint64) string {
 	return FormatMoneyPrecision(amount, 5)
 }
 
-//8 precision
+// 8 precision
 func FormatMoney8(amount uint64) string {
 	return FormatMoneyPrecision(amount, 8)
 }
@@ -439,4 +454,77 @@ func ParseAmount(str string) (amount uint64, err error) {
 // gets a stack trace of all
 func StackTrace(all bool) string {
 	return string(debug.Stack())
+}
+
+// Solo Below
+
+var CountUniqueMiners int64
+var CountBlocksAccepted int64
+var CountOrphanBlocks int64
+
+var CountMinisAccepted int64 // total accepted which passed Powtest, chain may still ignore them
+var CountOrphanMinis int64
+
+var CountMinisRejected int64 // total rejected // note we are only counting rejected as those which didnot pass Pow test
+
+// Network Wide - My total blocks are CountBlocks+CountMinisAccepted
+var CountTotalBlocks int64
+
+var GOPSAgent bool = false
+var MemcachedEnabled bool = false
+var Cache = memcache.New("localhost:11211")
+
+// this will track foreign miniblock rate,
+var ForeignMiniFoundTime = make(map[string][]int64) // this array contains a epoch timestamp in int64
+var ForeignMiniFoundTime_lock sync.Mutex
+
+// this function will return wrong result if too wide time glitches happen to system clock
+func ForeignMiniCounter(wallet string, seconds int64) (r int) { // we need atleast 1 mini to find a rate
+	ForeignMiniFoundTime_lock.Lock()
+	defer ForeignMiniFoundTime_lock.Unlock()
+	length := len(ForeignMiniFoundTime[wallet])
+	if length > 0 {
+		start_point := time.Now().Unix() - seconds
+		i := sort.Search(length, func(i int) bool { return ForeignMiniFoundTime[wallet][i] >= start_point })
+		if i < len(ForeignMiniFoundTime[wallet]) {
+			r = length - i
+		}
+	}
+	return // return 0
+}
+
+func CleanupForeignMiniCounter() {
+	ForeignMiniFoundTime_lock.Lock()
+	defer ForeignMiniFoundTime_lock.Unlock()
+
+	for wallet, _ := range ForeignMiniFoundTime {
+
+		length := len(ForeignMiniFoundTime[wallet])
+		if length > 0 {
+			start_point := time.Now().Unix() - 30*24*3600 // only keep data of last 30 days
+			i := sort.Search(length, func(i int) bool { return ForeignMiniFoundTime[wallet][i] >= start_point })
+			if i > 1000 && i < length {
+				ForeignMiniFoundTime[wallet] = append(ForeignMiniFoundTime[wallet][:0], ForeignMiniFoundTime[wallet][i:]...) // renew the array
+			}
+		}
+	}
+}
+
+func ForeignHashrateEstimatePercent(wallet string, timeframe int64) float64 {
+	return float64(ForeignMiniCounter(wallet, timeframe)*100) / (float64(timeframe*10) / float64(config.BLOCK_TIME))
+}
+
+// note this will be be 0, if you have less than 1/48000 hash power
+func ForeignHashrateEstimatePercent_1hr(wallet string) float64 {
+	return ForeignHashrateEstimatePercent(wallet, 3600)
+}
+
+// note result will be 0, if you have  less than 1/2000 hash power
+func ForeignHashrateEstimatePercent_1day(wallet string) float64 {
+	return ForeignHashrateEstimatePercent(wallet, 24*3600)
+}
+
+// note this will be 0, if you have less than 1/(48000*7)
+func ForeignHashrateEstimatePercent_7day(wallet string) float64 {
+	return ForeignHashrateEstimatePercent(wallet, 7*24*3600)
 }

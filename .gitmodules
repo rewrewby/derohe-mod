@@ -1,0 +1,9 @@
+[submodule "vendor/github.com/google/gops"]
+	path = vendor/github.com/google/gops
+	url = https://github.com/google/gops.git
+[submodule "vendor/github.com/bradfitz/gomemcache"]
+	path = vendor/github.com/bradfitz/gomemcache
+	url = https://github.com/bradfitz/gomemcache.git
+[submodule "vendor/github.com/bradfitz/vendor/github.com/bradfitz/gomemcache"]
+	path = vendor/github.com/bradfitz/vendor/github.com/bradfitz/gomemcache
+	url = https://github.com/bradfitz/gomemcache.git
