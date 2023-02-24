@@ -2,10 +2,8 @@
 
 If you don't alredy know DERO - Check out [Dero git repo](https://github.com/deroproject/derohe)
 
-* This is NOT the official release of DERO.
-* This version is a modified version of DERO and contains a developer fee mechanism.
+* This is NOT the official release of DERO. This version is a modified version of DERO.
 * If all your minis get lost or your computer blows up, it's no my fault, you installed this.
-
 
 * This modded DERO version is powering DERO Community Pools and it's related services.
   * DERO Community Pools - https://community-pools.mysrv.cloud/
@@ -21,11 +19,11 @@ If you don't alredy know DERO - Check out [Dero git repo](https://github.com/der
 ### Changes from official release includes (but not limited to)
 
 * Many Mining and Network stats
-* Live TX, Blocks, Orphans and Node Connectiviy Tracking
+* Live TX, Blocks, Orphans and Connectiviy Tracking
 * Running Node Config Changes
-* Change of debug level at run time
-* Anti-Cheat Mining Feature
-* Many new command (check **help** and **config** command)
+* Enhanced debug features
+* MiniBlock Anti-Cheat Mining
+* And many new command (check **help** and **config** for more)
 
 ### Screen Shots
 
@@ -38,11 +36,6 @@ If you don't alredy know DERO - Check out [Dero git repo](https://github.com/der
 
 ![More Options](https://dero-node.mysrv.cloud/images/more-options.png)
 ![Running Config](https://dero-node.mysrv.cloud/images/running-config.png)
-
-#### Diagnostics
-
-![Diagnostics](https://dero-node.mysrv.cloud/images/diagnostics.png)
-![Diagnostic Report](https://dero-node.mysrv.cloud/images/diagnostic_report.png)
 
 #### Peering Stuff
 
