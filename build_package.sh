@@ -51,8 +51,13 @@ for PLATFORM in $PLATFORMS; do
   OUTPUT_DIR="${ABSDIR}/build/dero_${GOOS}_${GOARCH}"
   BIN_FILENAME="${OUTPUT}-${GOOS}-${GOARCH}"
   echo  mkdir -p $OUTPUT_DIR
-  if [[ "${GOOS}" == "windows" ]]; then BIN_FILENAME="${BIN_FILENAME}.exe"; fi
-  CMD="GOOS=${GOOS} GOARCH=${GOARCH} go build -trimpath -ldflags=-buildid= -gcflags=${GCFLAGS} -o $OUTPUT_DIR/${BIN_FILENAME} $package"
+  if [[ "${GOOS}" == "linux" && "${GOARCH}" == "amd64" ]] ; then
+	  CGO_ENABLED=0
+	  CMD="CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -trimpath -ldflags=-buildid= -gcflags=${GCFLAGS} -o $OUTPUT_DIR/${BIN_FILENAME} $package"
+  else 
+	  if [[ "${GOOS}" == "windows" ]]; then BIN_FILENAME="${BIN_FILENAME}.exe"; fi
+	  CMD="GOOS=${GOOS} GOARCH=${GOARCH} go build -trimpath -ldflags=-buildid= -gcflags=${GCFLAGS} -o $OUTPUT_DIR/${BIN_FILENAME} $package"
+  fi
   echo "${CMD}"
   eval $CMD || FAILURES="${FAILURES} ${PLATFORM}"
 

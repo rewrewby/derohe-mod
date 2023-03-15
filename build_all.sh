@@ -5,6 +5,7 @@ BASEDIR=$(dirname $0)
 ABSPATH=$(readlink -f $0)
 ABSDIR=$(dirname $ABSPATH)
 
+rm build/dero_windows_amd64*
 
 unset GOPATH
 
