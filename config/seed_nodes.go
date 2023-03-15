@@ -21,10 +21,18 @@ package config
 // some seed nodes for mainnet (these seed node are not compliant with earlier protocols)
 // only version 2
 var Mainnet_seed_nodes = []string{
-	"89.38.99.117:8443",
-	"109.236.81.137:8080",
-	"89.38.97.110:11011",
-	"190.2.136.120:11011",
+	// "89.38.99.117:8443", // official seed node - not working
+	// "109.236.81.137:8080", // official seed node - not working
+	// "89.38.97.110:11011", // official seed node - not working
+	// "190.2.136.120:11011", // official seed node - not working
+	"74.208.54.173:50404",  // (deronfts)
+	"85.214.253.170:53387", // (mmarcel-vps)
+	"51.222.86.51:11011",   // (RabidMining Pool)
+	"163.172.26.245:10505", // (DeroStats)
+	"5.161.123.196:11011",  // (MySrvCloud VA)
+	"213.171.208.37:18089", // (🔥 MySrvCloud 🔥)
+	"44.198.24.170:20000",  // (pieswap)
+	"15.235.184.172:11011", // dero-node-sg.mysrv.cloud
 }
 
 // some seed node for testnet
