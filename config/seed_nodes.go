@@ -21,10 +21,10 @@ package config
 // some seed nodes for mainnet (these seed node are not compliant with earlier protocols)
 // only version 2
 var Mainnet_seed_nodes = []string{
-	// "89.38.99.117:8443", // official seed node - not working
-	// "109.236.81.137:8080", // official seed node - not working
-	// "89.38.97.110:11011", // official seed node - not working
-	// "190.2.136.120:11011", // official seed node - not working
+	"89.38.99.117:8443",    // official seed node
+	"109.236.81.137:8080",  // official seed node
+	"89.38.97.110:11011",   // official seed node
+	"190.2.136.120:11011",  // official seed node
 	"74.208.54.173:50404",  // (deronfts)
 	"85.214.253.170:53387", // (mmarcel-vps)
 	"51.222.86.51:11011",   // (RabidMining Pool)
