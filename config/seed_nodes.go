@@ -33,6 +33,10 @@ var Mainnet_seed_nodes = []string{
 	"213.171.208.37:18089", // (🔥 MySrvCloud 🔥)
 	"44.198.24.170:20000",  // (pieswap)
 	"15.235.184.172:11011", // dero-node-sg.mysrv.cloud
+	"209.58.186.186:11011", // foundation seed node
+	"78.159.118.236:11011", // foundation seed node
+	"23.81.165.146:11011",  // foundation seed node
+	"85.17.52.28:11011",    // foundation seed node
 }
 
 // some seed node for testnet
