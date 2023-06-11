@@ -16,7 +16,11 @@
 
 package rpc
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/deroproject/derohe/config"
+	"math/big"
+)
 import "context"
 import "runtime/debug"
 import "golang.org/x/time/rate"
@@ -69,6 +73,11 @@ func GetBlockTemplate(ctx context.Context, p rpc.GetBlockTemplate_Params) (resul
 		result.Blocktemplate_blob = fmt.Sprintf("%x", bl.Serialize())
 	}
 	diff := chain.Get_Difficulty_At_Tips(bl.Tips)
+
+	if mbl.HighDiff {
+		diff.Mul(diff, new(big.Int).SetUint64(config.MINIBLOCK_HIGHDIFF))
+	}
+
 	result.Blockhashing_blob = mbl_hex
 	result.Height = bl.Height
 	result.Prev_Hash = prev_hash
