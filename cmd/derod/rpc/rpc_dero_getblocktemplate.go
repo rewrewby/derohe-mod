@@ -78,6 +78,7 @@ func GetBlockTemplate(ctx context.Context, p rpc.GetBlockTemplate_Params) (resul
 		diff.Mul(diff, new(big.Int).SetUint64(config.MINIBLOCK_HIGHDIFF))
 	}
 
+	result.MiniBlocks = uint64(len(bl.MiniBlocks))
 	result.Blockhashing_blob = mbl_hex
 	result.Height = bl.Height
 	result.Prev_Hash = prev_hash
